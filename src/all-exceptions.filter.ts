@@ -2,7 +2,7 @@ import {
     Catch,
     ArgumentsHost,
     HttpStatus,
-    HttpException
+    HttpException,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { Request, Response } from 'express';
@@ -39,7 +39,7 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
             statusCode: statusCode,
             timestamp: new Date().toISOString(),
             path: request.url,
-            response: responseMessage
+            response: responseMessage,
         };
 
         response.status(myResponse.statusCode).json(myResponse);
@@ -48,7 +48,7 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
             typeof responseMessage === 'string'
                 ? responseMessage
                 : JSON.stringify(responseMessage),
-            AllExceptionsFilter.name
+            AllExceptionsFilter.name,
         );
         super.catch(exception, host);
     }
