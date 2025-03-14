@@ -19,6 +19,7 @@ type MyResponseObj = {
 @Catch()
 export class AllExceptionsFilter extends BaseExceptionFilter {
     private readonly logger = new AppLoggerService(AllExceptionsFilter.name);
+    private readonly isDevelopment = process.env.NODE_ENV !== 'production';
 
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
@@ -32,14 +33,16 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
             responseMessage = exception.getResponse();
         } else if (exception instanceof PrismaClientValidationError) {
             statusCode = HttpStatus.UNPROCESSABLE_ENTITY;
-            responseMessage = exception.message.replace(/\n/g, '');
+            responseMessage = this.isDevelopment
+                ? exception.message.replace(/\n/g, '')
+                : 'Invalid request data';
         }
 
         const myResponse: MyResponseObj = {
             statusCode: statusCode,
             timestamp: new Date().toISOString(),
             path: request.url,
-            response: responseMessage,
+            response: responseMessage, // It could be dangerous to expose the actual error message to the client if it is not a "safe" error like HttpException
         };
 
         response.status(myResponse.statusCode).json(myResponse);

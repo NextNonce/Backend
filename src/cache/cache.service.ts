@@ -1,10 +1,11 @@
 import { Injectable, Inject } from '@nestjs/common';
 import IORedis from 'ioredis';
 
-
 @Injectable()
 export class CacheService {
-    constructor(@Inject('REDIS_CLIENT') private readonly redisClient: IORedis) {}
+    constructor(
+        @Inject('REDIS_CLIENT') private readonly redisClient: IORedis,
+    ) {}
 
     async get<T>(key: string): Promise<T | undefined> {
         const data = await this.redisClient.get(key);

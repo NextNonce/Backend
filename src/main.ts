@@ -8,6 +8,9 @@ async function bootstrap() {
     const { httpAdapter } = app.get(HttpAdapterHost);
     app.useGlobalFilters(new AllExceptionsFilter(httpAdapter));
 
+    app.enableCors(); // For now api is open to all origins (to everyone)
+    app.setGlobalPrefix('v1');
+
     await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
