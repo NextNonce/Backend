@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
     provider = "prisma-client-js"
 }
@@ -11,19 +5,42 @@ generator client {
 generator nestjsDto {
     provider                        = "prisma-generator-nestjs-dto"
     output                          = "../src/generated/nestjs-dto"
-    outputToNestJsResourceStructure = "true"
     classValidation                 = "true"
+    outputToNestJsResourceStructure = "true"
+    prettier                        = "true"
     requiredResponseApiProperty     = "true"
-    prettier                        = "true" // Auto-format output
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
 }
 
-model User {
+model auth_trigger_log {
+    id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+    message    String?
+    payload    Json?
+    created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Auths {
+    id          String   @id @default(uuid())
+    provider    String
+    userId      String?  @unique
+    providerUid String   @unique @db.Uuid
+    user        Users?   @relation(fields: [userId], references: [id])
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@unique([provider, providerUid])
+}
+
+model Users {
     id        String   @id @default(uuid())
+    email     String?  @unique
+    auth      Auths?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }
