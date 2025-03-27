@@ -5,7 +5,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { SupabaseAuthProvider } from './providers/supabase-auth.provider';
 import { CacheModule } from '@/cache/cache.module';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { ConfigModule} from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { AUTH_PROVIDER } from '@/auth/interfaces/auth-provider.interface';
 
 @Module({

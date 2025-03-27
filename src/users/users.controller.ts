@@ -1,17 +1,10 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Body,
-    Patch,
-    Delete,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Delete } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Auth, AuthenticatedUser } from '@/auth/decorators';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
-import { AuthUserDto} from '@/auth/dto/auth-user.dto';
+import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 
 @Auth()
 @Controller('users')
@@ -34,13 +27,20 @@ export class UsersController {
 
     @Get('me')
     getMe(@AuthenticatedUser() authUser: AuthUserDto) {
-        this.logger.log(`authUser ${JSON.stringify(authUser)} is getting their own User`);
+        this.logger.log(
+            `authUser ${JSON.stringify(authUser)} is getting their own User`,
+        );
         return this.usersService.findByAuthUser(authUser);
     }
 
     @Patch('me')
-    updateMe(@AuthenticatedUser() authUser: AuthUserDto, @Body() updateUserDto: UpdateUserDto) {
-        this.logger.log(`User with authUser: ${JSON.stringify(authUser)} is updated with ${JSON.stringify(updateUserDto)}`);
+    updateMe(
+        @AuthenticatedUser() authUser: AuthUserDto,
+        @Body() updateUserDto: UpdateUserDto,
+    ) {
+        this.logger.log(
+            `User with authUser: ${JSON.stringify(authUser)} is updated with ${JSON.stringify(updateUserDto)}`,
+        );
         return this.usersService.update(updateUserDto, authUser);
     }
 

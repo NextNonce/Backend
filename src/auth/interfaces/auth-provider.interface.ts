@@ -1,4 +1,4 @@
-import { AuthUserDto} from '@/auth/dto/auth-user.dto';
+import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 
 export const AUTH_PROVIDER = Symbol('AUTH_PROVIDER');
 export interface AuthProvider {

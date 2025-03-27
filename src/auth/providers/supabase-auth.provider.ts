@@ -2,10 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { AuthProvider } from '../interfaces/auth-provider.interface';
 import { ConfigService } from '@nestjs/config';
-import { AppLoggerService} from '@/app-logger/app-logger.service';
+import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 import { plainToInstance } from 'class-transformer';
-
 
 @Injectable()
 export class SupabaseAuthProvider implements AuthProvider {
@@ -45,9 +44,11 @@ export class SupabaseAuthProvider implements AuthProvider {
     }
 
     async deleteAuthUserById(id: string): Promise<void> {
-        const { data, error } = await this.supabaseClient.auth.admin.deleteUser(id);
+        const { error } = await this.supabaseClient.auth.admin.deleteUser(id);
         if (error) {
-            this.logger.error(`Failed to delete user by id: ${id}, with error: ${error.message}`);
+            this.logger.error(
+                `Failed to delete user by id: ${id}, with error: ${error.message}`,
+            );
         }
         this.logger.log(`Deleted AuthUser with id: ${id}`);
     }

@@ -1,9 +1,13 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+    Injectable,
+    InternalServerErrorException,
+    NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { AuthUserDto} from '@/auth/dto/auth-user.dto';
+import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 import { DatabaseService } from '@/database/database.service';
-import { AuthService} from '@/auth/auth.service';
+import { AuthService } from '@/auth/auth.service';
 
 @Injectable()
 export class UsersService {
@@ -32,7 +36,9 @@ export class UsersService {
             },
         });
         if (!user) {
-            throw new NotFoundException(`User with authUser ${JSON.stringify(authUser)} does not exist`);
+            throw new NotFoundException(
+                `User with authUser ${JSON.stringify(authUser)} does not exist`,
+            );
         }
         return user;
     }
@@ -58,7 +64,9 @@ export class UsersService {
             // Step 2: Only if transaction succeeds, delete from Supabase
             await this.authService.deleteAuthUser(authUser);
         } catch (err) {
-            throw new InternalServerErrorException('Failed to delete user');
+            throw new InternalServerErrorException(
+                `Failed to delete user ${err}`,
+            );
         }
         return user;
     }

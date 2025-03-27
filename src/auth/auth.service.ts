@@ -1,8 +1,11 @@
 import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
-import { AuthProvider, AUTH_PROVIDER } from './interfaces/auth-provider.interface';
+import {
+    AuthProvider,
+    AUTH_PROVIDER,
+} from './interfaces/auth-provider.interface';
 import { CacheService } from '@/cache/cache.service';
-import { AuthUserDto} from '@/auth/dto/auth-user.dto';
+import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -20,7 +23,7 @@ export class AuthService {
             await this.cacheService.get(token); // Maybe make key more complex
         if (cachedAuthUser) {
             this.logger.log(
-                `Getting cachedAuthUser ${JSON.stringify(cachedAuthUser)} with token ${token}`
+                `Getting cachedAuthUser ${JSON.stringify(cachedAuthUser)} with token ${token}`,
             );
             return cachedAuthUser;
         }
@@ -28,9 +31,7 @@ export class AuthService {
         const authUser = await this.authProvider.getAuthUserByJwt(token);
 
         if (authUser) {
-            this.logger.log(
-                `Getting authUser ${JSON.stringify(authUser)}`,
-            );
+            this.logger.log(`Getting authUser ${JSON.stringify(authUser)}`);
             await this.cacheService.set(token, authUser, 60 * 60);
         } else {
             this.logger.error(`Failed to get auth user by token: ${token}`);
@@ -39,14 +40,18 @@ export class AuthService {
         return authUser;
     }
 
-    async createRecord(db: Prisma.TransactionClient, authUser: AuthUserDto, userId: string) {
+    async createRecord(
+        db: Prisma.TransactionClient,
+        authUser: AuthUserDto,
+        userId: string,
+    ) {
         return db.auths.create({
             data: {
                 provider: this.authProvider.getName(),
                 userId: userId,
                 providerUid: authUser.id,
             },
-        })
+        });
     }
 
     async deleteRecord(db: Prisma.TransactionClient, authUser: AuthUserDto) {
