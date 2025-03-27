@@ -3,6 +3,7 @@ import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { AuthProvider, AUTH_PROVIDER } from './interfaces/auth-provider.interface';
 import { CacheService } from '@/cache/cache.service';
 import { AuthUserDto} from '@/auth/dto/auth-user.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -25,7 +26,7 @@ export class AuthService {
         }
 
         const authUser = await this.authProvider.getAuthUserByJwt(token);
-        //const authUser = {id: '4', created_at: 'aa'} as AuthUser;
+
         if (authUser) {
             this.logger.log(
                 `Getting authUser ${JSON.stringify(authUser)}`,
@@ -36,5 +37,28 @@ export class AuthService {
             throw new UnauthorizedException('Invalid token');
         }
         return authUser;
+    }
+
+    async createRecord(db: Prisma.TransactionClient, authUser: AuthUserDto, userId: string) {
+        return db.auths.create({
+            data: {
+                provider: this.authProvider.getName(),
+                userId: userId,
+                providerUid: authUser.id,
+            },
+        })
+    }
+
+    async deleteRecord(db: Prisma.TransactionClient, authUser: AuthUserDto) {
+        return db.auths.delete({
+            where: {
+                provider: this.authProvider.getName(),
+                providerUid: authUser.id,
+            },
+        });
+    }
+
+    async deleteAuthUser(authUser: AuthUserDto) {
+        return this.authProvider.deleteAuthUserById(authUser.id);
     }
 }
