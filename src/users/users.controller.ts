@@ -4,7 +4,6 @@ import {
     Post,
     Body,
     Patch,
-    Param,
     Delete,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
