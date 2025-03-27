@@ -5,9 +5,6 @@ export class AuthUserDto {
     id: string;
 
     @Expose()
-    email?: string;
-
-    @Expose()
     created_at: string;
 
     @Expose()
