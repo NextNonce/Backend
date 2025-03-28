@@ -17,19 +17,32 @@ datasource db {
     directUrl = env("DIRECT_URL")
 }
 
-model auth_trigger_log {
-    id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-    message    String?
-    payload    Json?
-    created_at DateTime? @default(now()) @db.Timestamp(6)
+enum WalletType {
+    SIMPLE
+    SMART
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+enum ChainType {
+    EVM
+    CAIROVM
+    //SVM
+    //MOVEVM
+    //BITCOIN
+    //TONVM
+    //TRONVM
+}
+
+enum PortfolioAccess {
+    PRIVATE
+    PUBLIC
+    UNLISTED
+}
+
 model Auths {
     id          String   @id @default(uuid())
     provider    String
     userId      String?  @unique
-    providerUid String   @unique @db.Uuid
+    providerUid String   @unique
     user        Users?   @relation(fields: [userId], references: [id])
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
@@ -38,9 +51,51 @@ model Auths {
 }
 
 model Users {
-    id        String   @id @default(uuid())
-    email     String?  @unique
-    auth      Auths?
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    id         String       @id @default(uuid())
+    email      String?      @unique
+    auth       Auths?
+    watchlist  Watchlists?
+    createdAt  DateTime     @default(now())
+    updatedAt  DateTime     @updatedAt
+    portfolios Portfolios[]
+}
+
+model Wallets {
+    id             String       @id @default(uuid())
+    address        String       @unique
+    walletType     WalletType
+    chainType      ChainType
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @updatedAt
+    derivationInfo Json? // for Bitcoin-like {"derivation": "single | hd", type: "legacy | segwit | nativeSegwit | taproot"}
+    portfolios     Portfolios[] // many-to-many with Portfolios
+    watchlists     Watchlists[] // many-to-many with Watchlists
+}
+
+model Chains {
+    id        String    @id @default(uuid())
+    name      String    @unique
+    chainType ChainType
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+}
+
+model Portfolios {
+    id              String          @id @default(uuid())
+    name            String
+    ownerId         String
+    owner           Users           @relation(fields: [ownerId], references: [id])
+    portfolioAccess PortfolioAccess @default(PRIVATE)
+    createdAt       DateTime        @default(now())
+    updatedAt       DateTime        @updatedAt
+    wallets         Wallets[] // many-to-many with Wallets
+}
+
+model Watchlists {
+    id        String    @id @default(uuid())
+    ownerId   String    @unique
+    owner     Users     @relation(fields: [ownerId], references: [id])
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    wallets   Wallets[] // many-to-many with Wallets
 }

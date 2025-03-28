@@ -61,7 +61,7 @@ export class UsersService {
                 await db.users.delete({ where: { id: user.id } }); // public.Users
             });
 
-            // Step 2: Only if transaction succeeds, delete from Supabase
+            // Step 2: Only if transaction succeeds, delete from Auth Provider
             await this.authService.deleteAuthUser(authUser);
         } catch (err) {
             throw new InternalServerErrorException(
