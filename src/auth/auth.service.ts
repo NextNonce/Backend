@@ -45,7 +45,7 @@ export class AuthService {
         authUser: AuthUserDto,
         userId: string,
     ) {
-        return db.auths.create({
+        return db.auth.create({
             data: {
                 provider: this.authProvider.getName(),
                 userId: userId,
@@ -55,7 +55,7 @@ export class AuthService {
     }
 
     async deleteRecord(db: Prisma.TransactionClient, authUser: AuthUserDto) {
-        return db.auths.delete({
+        return db.auth.delete({
             where: {
                 provider: this.authProvider.getName(),
                 providerUid: authUser.id,
