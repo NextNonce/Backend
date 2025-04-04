@@ -81,10 +81,53 @@ model Chain {
     id        String    @id @default(uuid())
     name      String    @unique
     chainType ChainType
+    tokens    Token[] // One-to-many relation to tokens
     createdAt DateTime  @default(now())
     updatedAt DateTime  @updatedAt
 
     @@map("chains")
+}
+
+model UnifiedToken {
+    id              String        @id @default(uuid())
+    tokenMetadataId String        @unique
+    tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
+    tokens          Token[]
+    createdAt       DateTime      @default(now())
+    updatedAt       DateTime      @updatedAt
+
+    @@map("unified_tokens")
+}
+
+model Token {
+    id              String        @id @default(uuid())
+    chainId         String
+    chain           Chain         @relation(fields: [chainId], references: [id])
+    address         String
+    tokenMetadataId String        @unique
+    tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
+    unifiedTokenId  String?
+    unifiedToken    UnifiedToken? @relation(fields: [unifiedTokenId], references: [id])
+    createdAt       DateTime      @default(now())
+    updatedAt       DateTime      @updatedAt
+
+    @@index([address])
+    @@map("tokens")
+}
+
+model TokenMetadata {
+    id           String        @id @default(uuid())
+    symbol       String
+    name         String
+    decimals     Int
+    logo         String
+    description  String?
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+    Token        Token?
+    UnifiedToken UnifiedToken?
+
+    @@map("token_metadata")
 }
 
 model Portfolio {
