@@ -36,6 +36,13 @@ export class AppLoggerService extends ConsoleLogger {
         super.log(message, contextMessage);
     }
 
+    warn(message: any, context?: string) {
+        const entry = `[WARN] ${context ? `[${context}] ` : `${this.context}`}\t${message}`;
+        this.writeToFile(this.logFilePath, entry).catch(console.error);
+        const contextMessage = context ?? this.context ?? 'Unknown context';
+        super.warn(message, contextMessage);
+    }
+
     error(message: any, stackOrContext?: string) {
         const entry = `[ERROR] ${stackOrContext ? `[${stackOrContext}] ` : `${this.context}`}\t${message}`;
         this.writeToFile(this.errorLogPath, entry).catch(console.error);
