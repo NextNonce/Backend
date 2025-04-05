@@ -18,8 +18,13 @@ type MyResponseObj = {
 
 @Catch()
 export class AllExceptionsFilter extends BaseExceptionFilter {
-    private readonly logger = new AppLoggerService(AllExceptionsFilter.name);
-    private readonly isDevelopment = process.env.NODE_ENV !== 'production';
+    private readonly logger: AppLoggerService;
+    private readonly isDevelopment: boolean;
+    constructor() {
+        super();
+        this.logger = new AppLoggerService(AllExceptionsFilter.name);
+        this.isDevelopment = process.env.NODE_ENV !== 'production';
+    }
 
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
@@ -47,12 +52,14 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
 
         response.status(myResponse.statusCode).json(myResponse);
 
-        this.logger.error(
-            typeof responseMessage === 'string'
-                ? responseMessage
-                : JSON.stringify(responseMessage),
-            AllExceptionsFilter.name,
-        );
+        if (!(exception as any).alreadyLogged) {
+            this.logger.error(
+                typeof responseMessage === 'string'
+                    ? responseMessage
+                    : JSON.stringify(responseMessage),
+                AllExceptionsFilter.name,
+            );
+        }
         super.catch(exception, host);
     }
 }
