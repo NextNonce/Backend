@@ -2,7 +2,7 @@ import {
     Catch,
     ArgumentsHost,
     HttpStatus,
-    HttpException,
+    HttpException, HttpServer,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { Request, Response } from 'express';
@@ -20,8 +20,8 @@ type MyResponseObj = {
 export class AllExceptionsFilter extends BaseExceptionFilter {
     private readonly logger: AppLoggerService;
     private readonly isDevelopment: boolean;
-    constructor() {
-        super();
+    constructor(applicationRef?: HttpServer | undefined) {
+        super(applicationRef);
         this.logger = new AppLoggerService(AllExceptionsFilter.name);
         this.isDevelopment = process.env.NODE_ENV !== 'production';
     }
