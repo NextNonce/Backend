@@ -18,7 +18,7 @@ export class SupabaseAuthProvider implements AuthProvider {
         const supabaseKey = configService.get<string>('SUPABASE_KEY');
 
         if (supabaseUrl === undefined || supabaseKey === undefined) {
-            this.logger.error('Supabase configuration is missing',);
+            this.logger.error('Supabase configuration is missing');
             throwLogged(new InternalServerErrorException());
         }
 
@@ -33,7 +33,7 @@ export class SupabaseAuthProvider implements AuthProvider {
         const { data, error } = await this.supabaseClient.auth.getUser(jwt);
         if (error) {
             this.logger.error(`Failed to get user by jwt: ${jwt}`);
-            throw error;
+            throwLogged(new InternalServerErrorException());
         }
         if (!data) {
             this.logger.error(`No user found for jwt: ${jwt}`);
@@ -52,6 +52,7 @@ export class SupabaseAuthProvider implements AuthProvider {
             this.logger.error(
                 `Failed to delete user by id: ${id}, with error: ${error.message}`,
             );
+            throwLogged(new InternalServerErrorException());
         }
         this.logger.log(`Deleted AuthUser with id: ${id}`);
     }

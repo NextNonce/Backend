@@ -14,10 +14,10 @@ export const AuthenticatedUser = createParamDecorator(
         const authUser = request.user as AuthUserDto | undefined; // this was returned from JwtStrategy.validate()
 
         if (!authUser) {
-            logger.error('No authenticated user found in request');
+            logger.error('No authUser found in request');
             throwLogged(new UnauthorizedException('User not found'));
         }
-        logger.log(`Got user: ${JSON.stringify(authUser)}`);
+        logger.log(`Got authUser: ${JSON.stringify(authUser)}`);
         return authUser;
     },
 );

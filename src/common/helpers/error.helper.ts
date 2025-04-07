@@ -1,4 +1,4 @@
 export function throwLogged<T extends Error>(error: T): never {
-    (error as any).alreadyLogged = true;
+    (error as { alreadyLogged?: boolean }).alreadyLogged = true;
     throw error;
 }

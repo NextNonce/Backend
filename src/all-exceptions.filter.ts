@@ -2,7 +2,8 @@ import {
     Catch,
     ArgumentsHost,
     HttpStatus,
-    HttpException, HttpServer,
+    HttpException,
+    HttpServer,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { Request, Response } from 'express';
@@ -20,7 +21,7 @@ type MyResponseObj = {
 export class AllExceptionsFilter extends BaseExceptionFilter {
     private readonly logger: AppLoggerService;
     private readonly isDevelopment: boolean;
-    constructor(applicationRef?: HttpServer | undefined) {
+    constructor(applicationRef?: HttpServer) {
         super(applicationRef);
         this.logger = new AppLoggerService(AllExceptionsFilter.name);
         this.isDevelopment = process.env.NODE_ENV !== 'production';
@@ -52,7 +53,7 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
 
         response.status(myResponse.statusCode).json(myResponse);
 
-        if (!(exception as any).alreadyLogged) {
+        if (!(exception as { alreadyLogged?: boolean }).alreadyLogged) {
             this.logger.error(
                 typeof responseMessage === 'string'
                     ? responseMessage

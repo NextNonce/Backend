@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import {
+    Injectable,
+    InternalServerErrorException,
+    UnauthorizedException,
+} from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -17,7 +21,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         const jwtSecret = configService.get<string>('JWT_SECRET');
         if (!jwtSecret) {
             JwtStrategy.logger.error('JWT_SECRET is not defined');
-            throwLogged(new InternalServerErrorException('Internal server error'));
+            throwLogged(
+                new InternalServerErrorException('Internal server error'),
+            );
         }
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
