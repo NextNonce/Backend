@@ -32,15 +32,18 @@
         "@nestjs/throttler": "^6.4.0",
         "@prisma/client": "^6.5.0",
         "@supabase/supabase-js": "^2.49.4",
+        "alchemy-sdk": "^3.5.6",
         "axios": "^1.8.4",
         "class-transformer": "^0.5.1",
         "class-validator": "^0.14.1",
+        "ethers": "^6.13.5",
         "ioredis": "^5.6.0",
         "jsonwebtoken": "^9.0.2",
         "passport": "^0.7.0",
         "passport-jwt": "^4.0.1",
         "reflect-metadata": "^0.2.2",
-        "rxjs": "^7.8.1"
+        "rxjs": "^7.8.1",
+        "starknet": "^6.24.1"
     },
     "devDependencies": {
         "@eslint/eslintrc": "^3.3.1",
@@ -88,6 +91,9 @@
             "**/*.(t|j)s"
         ],
         "coverageDirectory": "../coverage",
-        "testEnvironment": "node"
+        "testEnvironment": "node",
+        "moduleNameMapper": {
+            "^@/(.*)$": "<rootDir>/$1"
+        }
     }
 }
