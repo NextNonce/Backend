@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
 import { CacheService } from './cache.service';
 import IORedis from 'ioredis';
+import { ConfigModule } from '@nestjs/config';
 
 const CacheProvider = {
     provide: 'REDIS_CLIENT',
@@ -18,7 +19,9 @@ const CacheProvider = {
     },
 };
 
+@Global()
 @Module({
+    imports: [ConfigModule],
     providers: [CacheProvider, CacheService],
     exports: [CacheProvider, CacheService],
 })
