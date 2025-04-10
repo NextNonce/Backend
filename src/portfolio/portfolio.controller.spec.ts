@@ -1,35 +1,34 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UserService } from './user.service';
+import { PortfolioController } from './portfolio.controller';
+import { PortfolioService } from './portfolio.service';
 import { createMockDatabaseService } from '../../test/helpers/database.mock';
 import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
 import { mockCacheService } from '../../test/helpers/cache.mock';
-import { AuthService } from '@/auth/auth.service';
-import { PortfolioService } from '@/portfolio/portfolio.service';
-import { mockAuthService } from '../../test/helpers/auth.mock';
-import { mockPortfolioService } from '../../test/helpers/portfolio.mock';
+import { WalletService } from '@/wallet/wallet.service';
+import { mockWalletService } from '../../test/helpers/wallet.mock';
 
-describe('UserService', () => {
-    let service: UserService;
+describe('PortfolioController', () => {
+    let controller: PortfolioController;
     let mockDatabaseService: ReturnType<typeof createMockDatabaseService>;
 
     beforeEach(async () => {
         mockDatabaseService = createMockDatabaseService();
 
         const module: TestingModule = await Test.createTestingModule({
+            controllers: [PortfolioController],
             providers: [
-                UserService,
+                PortfolioService,
                 { provide: DatabaseService, useValue: mockDatabaseService },
                 { provide: CacheService, useValue: mockCacheService },
-                { provide: AuthService, useValue: mockAuthService },
-                { provide: PortfolioService, useValue: mockPortfolioService },
+                { provide: WalletService, useValue: mockWalletService },
             ],
         }).compile();
 
-        service = module.get<UserService>(UserService);
+        controller = module.get<PortfolioController>(PortfolioController);
     });
 
     it('should be defined', () => {
-        expect(service).toBeDefined();
+        expect(controller).toBeDefined();
     });
 });
