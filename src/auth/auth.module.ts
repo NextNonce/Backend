@@ -8,10 +8,9 @@ import { AUTH_PROVIDER } from '@/auth/interfaces/auth-provider.interface';
 
 @Module({
     imports: [ConfigModule],
-    controllers: [],
     providers: [
         {
-            provide: AUTH_PROVIDER, // 👈 token
+            provide: AUTH_PROVIDER, // 👈 interface token
             useClass: SupabaseAuthProvider, // 👈 concrete implementation
         },
         AuthService,

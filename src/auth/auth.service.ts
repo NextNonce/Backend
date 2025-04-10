@@ -1,5 +1,8 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
-import { AppLoggerService } from '@/app-logger/app-logger.service';
+import { Injectable, Inject } from '@nestjs/common';
+import {
+    AppLoggerService,
+    formatMessage,
+} from '@/app-logger/app-logger.service';
 import {
     AuthProvider,
     AUTH_PROVIDER,
@@ -7,7 +10,6 @@ import {
 import { CacheService } from '@/cache/cache.service';
 import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 import { Prisma } from '@prisma/client';
-import { throwLogged } from '@/common/helpers/error.helper';
 
 @Injectable()
 export class AuthService {
@@ -22,26 +24,19 @@ export class AuthService {
     }
 
     async getAuthUserByToken(token: string) {
-        const cacheKey = this.cacheService.getCacheKey('auth-user', { token });
-        this.logger.log(`Cache key for auth user: ${cacheKey}`);
         const cachedAuthUser: AuthUserDto | undefined =
-            await this.cacheService.get(cacheKey); // Maybe make key more complex
+            await this.getCachedAuthUserByToken(token);
         if (cachedAuthUser) {
             this.logger.log(
-                `Getting cachedAuthUser ${JSON.stringify(cachedAuthUser)} with token ${token}`,
+                `Getting cachedAuthUser ${JSON.stringify(cachedAuthUser)} with token ${formatMessage(token)}`,
             );
             return cachedAuthUser;
         }
 
         const authUser = await this.authProvider.getAuthUserByJwt(token);
+        this.logger.log(`Getting authUser ${JSON.stringify(authUser)}`);
+        await this.cacheAuthUserByToken(authUser, token);
 
-        if (authUser) {
-            this.logger.log(`Getting authUser ${JSON.stringify(authUser)}`);
-            await this.cacheService.set(cacheKey, authUser, 60 * 60);
-        } else {
-            this.logger.error(`Failed to get auth user by token: ${token}`);
-            throwLogged(new UnauthorizedException('Invalid token'));
-        }
         return authUser;
     }
 
@@ -69,6 +64,47 @@ export class AuthService {
     }
 
     async deleteAuthUser(authUser: AuthUserDto) {
+        await this.delCachedAuthUser(authUser);
         return this.authProvider.deleteAuthUserById(authUser.id);
+    }
+
+    private async cacheAuthUserByToken(authUser: AuthUserDto, token: string) {
+        // Canonical key for the full authUser.
+        const canonicalKey = this.cacheService.getCacheKey(
+            'auth-user',
+            authUser.id,
+        );
+
+        const pointerKey = this.cacheService.getCacheKey('auth-user:token', {
+            token,
+        });
+
+        await this.cacheService.set(pointerKey, authUser.id, 60 * 60);
+        await this.cacheService.set(canonicalKey, authUser, 60 * 60);
+    }
+
+    private async getCachedAuthUserByToken(
+        token: string,
+    ): Promise<AuthUserDto | undefined> {
+        const pointerKey = this.cacheService.getCacheKey('auth-user:token', {
+            token,
+        });
+        const authUserId = await this.cacheService.get<string>(pointerKey);
+        if (!authUserId) {
+            return undefined;
+        }
+        const canonicalKey = this.cacheService.getCacheKey(
+            'auth-user',
+            authUserId,
+        );
+        return await this.cacheService.get<AuthUserDto>(canonicalKey);
+    }
+
+    private async delCachedAuthUser(authUser: AuthUserDto) {
+        const canonicalKey = this.cacheService.getCacheKey(
+            'auth-user',
+            authUser.id,
+        );
+        await this.cacheService.del(canonicalKey);
     }
 }
