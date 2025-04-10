@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
-import { DatabaseModule } from '@/database/database.module';
 import { AuthModule } from '@/auth/auth.module';
 import { UserInterceptor } from '@/user/interceptors/user.interceptor';
+import { PortfolioModule } from '@/portfolio/portfolio.module';
 
 @Module({
-    imports: [DatabaseModule, AuthModule],
+    imports: [AuthModule, PortfolioModule],
     controllers: [UserController],
     providers: [UserService, UserInterceptor],
     exports: [UserService, UserInterceptor],
