@@ -1,22 +1,27 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { WalletService } from './wallet.service';
-import { CreateWalletDto } from './dto/create-wallet.dto';
+import { WalletIdentifierDto } from './dto/wallet-identifier.dto';
+import { WalletDto } from '@/wallet/dto/wallet.dto';
+import { Wallet } from '@prisma/client';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('wallets')
 @Controller('wallets')
 export class WalletController {
     constructor(private readonly walletService: WalletService) {}
 
-    @Post()
-    create(@Body() createWalletDto: CreateWalletDto) {
-        return this.walletService.create(createWalletDto.address);
-    }
-
-    @Get()
-    findAll() {
-        //return this.walletService.findAll();
-    }
-
-    findOne() {
-        //return this.walletService.findOne(+id);
+    @Get(':address')
+    @ApiOkResponse({
+        description:
+            'Returns wallet details for the specified wallet address; creates the wallet if it does not exist',
+        type: WalletDto,
+    })
+    async findOne(
+        @Param() walletIdentifierDto: WalletIdentifierDto,
+    ): Promise<WalletDto> {
+        const wallet: Wallet = await this.walletService.findOrCreate(
+            walletIdentifierDto.address,
+        );
+        return WalletDto.fromModel(wallet);
     }
 }

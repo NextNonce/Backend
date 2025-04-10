@@ -27,18 +27,16 @@ const EVMNetworksToCheck = [
     Network.BERACHAIN_MAINNET,
     Network.BLAST_MAINNET,
     Network.LINEA_MAINNET,
-    Network.ZORA_MAINNET,
     Network.SCROLL_MAINNET,
     Network.GNOSIS_MAINNET,
     Network.SONEIUM_MAINNET,
     Network.UNICHAIN_MAINNET,
-    Network.INK_MAINNET,
 ];
 
 // Internal storage for Alchemy instances
 let alchemyInstances: Record<Network, Alchemy>;
 
-// Internal function to create instances (not exported)
+// Internal function to findOrCreate instances (not exported)
 function createAlchemyInstances(apiKey: string): Record<Network, Alchemy> {
     const instances: Record<Network, Alchemy> = {} as Record<Network, Alchemy>;
     for (const network of EVMNetworksToCheck) {
@@ -64,7 +62,7 @@ export async function isEVMSmartContract(address: string): Promise<boolean> {
             logger.warn(
                 `Failed to get checksum EVM address ${address} on ${network}: ${error}`,
             );
-            throwLogged(new InternalServerErrorException());
+            return false;
         }
     });
 

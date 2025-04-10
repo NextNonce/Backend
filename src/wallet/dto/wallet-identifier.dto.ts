@@ -5,7 +5,7 @@ import {
     WALLET_ADDRESS_MAX_LENGTH,
 } from '@/wallet/constants/address.constants';
 
-export class CreateWalletDto {
+export class WalletIdentifierDto {
     @ApiProperty({
         type: 'string',
         minLength: WALLET_ADDRESS_MIN_LENGTH,
