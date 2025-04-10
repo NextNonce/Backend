@@ -9,6 +9,7 @@ import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
+import * as process from 'node:process';
 
 @Injectable()
 export class WalletService {
@@ -19,7 +20,10 @@ export class WalletService {
     ) {
         this.logger = new AppLoggerService(WalletService.name);
     }
-    async create(walletAddress: string, portfolioId?: string): Promise<Wallet> {
+    async findOrCreate(
+        walletAddress: string,
+        portfolioId?: string,
+    ): Promise<Wallet> {
         const { address, chainType } =
             this.extractAddressAndChainType(walletAddress);
         const existingWallet: Wallet | undefined =
@@ -32,7 +36,13 @@ export class WalletService {
             );
         }
         // Determine the wallet type based on address and chain type
+
+        const startTime = Date.now();
         const walletType: WalletType = await getWalletType(address, chainType);
+        const endTime = Date.now();
+        this.logger.debug(
+            `Wallet type determination took ${endTime - startTime}ms`,
+        );
         this.logger.log(
             `Creating wallet with address ${address} and type ${walletType}.`,
         );
@@ -49,7 +59,11 @@ export class WalletService {
 
         if (portfolioId) await this.delCacheByPortfolioId(portfolioId);
         const cacheKey = this.cacheService.getCacheKey('wallet', wallet.id);
-        await this.cacheService.set(cacheKey, wallet, 60 * 60);
+        await this.cacheService.set(
+            cacheKey,
+            wallet,
+            process.env.MODE === 'testing' ? 5 : 60 * 60,
+        );
         return wallet;
     }
 
@@ -70,7 +84,11 @@ export class WalletService {
             this.logger.warn(`Wallet with id ${id} not found`);
             return undefined;
         }
-        await this.cacheService.set(cacheKey, wallet, 60 * 60);
+        await this.cacheService.set(
+            cacheKey,
+            wallet,
+            process.env.MODE === 'testing' ? 5 : 60 * 60,
+        );
         return wallet;
     }
 
@@ -94,7 +112,11 @@ export class WalletService {
             this.logger.warn(`Wallet with address ${address} not found`);
             return undefined;
         }
-        await this.cacheService.set(pointerKey, wallet.id, 60 * 60);
+        await this.cacheService.set(
+            pointerKey,
+            wallet.id,
+            process.env.MODE === 'testing' ? 5 : 60 * 60,
+        );
         return wallet;
     }
 
@@ -117,10 +139,14 @@ export class WalletService {
             this.logger.warn(`No wallets found for portfolio ${portfolioId}`);
             return [];
         }
-        await this.cacheService.set(cacheKeyAll, wallets, 60 * 60);
+        //await this.cacheService.set(cacheKeyAll, wallets, 60 * 60);
+        await this.cacheService.set(
+            cacheKeyAll,
+            wallets,
+            process.env.MODE === 'testing' ? 5 : 60 * 60,
+        );
         return wallets;
     }
-
 
     private extractAddressAndChainType(walletAddress: string) {
         const chainType: ChainType | undefined = getChainType(walletAddress);
@@ -137,12 +163,12 @@ export class WalletService {
         return { address, chainType };
     }
 
-
     private async handleExistingWallet(
         wallet: Wallet,
         address: string,
         portfolioId?: string,
     ): Promise<Wallet> {
+        this.logger.log(`Handling existing wallet with address ${address}.`);
         if (portfolioId) {
             await this.delCacheByPortfolioId(portfolioId);
             const updatedWallet: Wallet =
@@ -166,8 +192,18 @@ export class WalletService {
 
     private async cacheWalletByPointerKey(wallet: Wallet, pointerKey: string) {
         const canonicalKey = this.cacheService.getCacheKey('wallet', wallet.id);
-        await this.cacheService.set(pointerKey, wallet.id, 60 * 60);
-        await this.cacheService.set(canonicalKey, wallet, 60 * 60);
+        //await this.cacheService.set(pointerKey, wallet.id, 60 * 60);
+        //await this.cacheService.set(canonicalKey, wallet, 60 * 60);
+        await this.cacheService.set(
+            pointerKey,
+            wallet.id,
+            process.env.MODE === 'testing' ? 5 : 60 * 60,
+        );
+        await this.cacheService.set(
+            canonicalKey,
+            wallet,
+            process.env.MODE === 'testing' ? 5 : 60 * 60,
+        );
     }
 
     // Clear cache for the all wallets in the portfolio
