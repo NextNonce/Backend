@@ -1,8 +1,15 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+    Injectable,
+    InternalServerErrorException,
+    NotFoundException,
+} from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { AuthProvider } from '../interfaces/auth-provider.interface';
 import { ConfigService } from '@nestjs/config';
-import { AppLoggerService } from '@/app-logger/app-logger.service';
+import {
+    AppLoggerService,
+    formatMessage,
+} from '@/app-logger/app-logger.service';
 import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 import { plainToInstance } from 'class-transformer';
 import { throwLogged } from '@/common/helpers/error.helper';
@@ -29,17 +36,19 @@ export class SupabaseAuthProvider implements AuthProvider {
         return 'Supabase';
     }
 
-    async getAuthUserByJwt(jwt: string): Promise<AuthUserDto | undefined> {
+    async getAuthUserByJwt(jwt: string): Promise<AuthUserDto> {
         const { data, error } = await this.supabaseClient.auth.getUser(jwt);
         if (error) {
-            this.logger.error(`Failed to get user by jwt: ${jwt}`);
-            throwLogged(new InternalServerErrorException());
+            this.logger.error(
+                `Failed to get user with error: ${error.message} by jwt: ${formatMessage(jwt)}`,
+            );
+            throwLogged(new NotFoundException());
         }
         if (!data) {
-            this.logger.error(`No user found for jwt: ${jwt}`);
-            return undefined;
+            this.logger.error(`No user found for jwt: ${formatMessage(jwt)}`);
+            throwLogged(new NotFoundException());
         }
-        this.logger.log(`Got user by jwt: ${jwt}`);
+        this.logger.log(`Got user by jwt: ${formatMessage(jwt)}`);
 
         return plainToInstance(AuthUserDto, data.user, {
             excludeExtraneousValues: true,
