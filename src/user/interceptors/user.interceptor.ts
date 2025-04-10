@@ -46,7 +46,7 @@ export class UserInterceptor implements NestInterceptor {
         const request = context
             .switchToHttp()
             .getRequest<RequestWithAuthUser>();
-        // This assumes that your AuthenticatedUser decorator (or JWT strategy) has already set request.user.
+        // This assumes that AuthenticatedUser decorator (or JWT strategy) has already set request.user.
         const authUser: AuthUserDto | undefined = request.user;
         if (!authUser || !authUser.id) {
             this.logger.error('No auth user found in request');

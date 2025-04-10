@@ -69,7 +69,6 @@ export class AppLoggerService extends ConsoleLogger {
     }
 
     debug(message: any, context?: string): void {
-        // You might want to conditionally enable this based on an environment variable
         if (process.env.NODE_ENV === 'production') return;
         const entry = `[DEBUG] ${context ? `[${context}] ` : `${this.context}`}\t${message}`;
         this.writeToFile(this.debugLogPath, entry).catch(console.error);
