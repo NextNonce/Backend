@@ -101,16 +101,9 @@ export class UserService {
     async removeMe(authUser: AuthUserDto): Promise<User> {
         const user: User = await this.findByAuthUser(authUser);
         try {
-            // Step 1: Delete from DB inside a transaction
-            await this.databaseService.$transaction(async (db) => {
-                await this.authService.deleteRecord(authUser, db); // public.Auths
-                await this.portfolioService.removeAll(user.id, db); // public.Portfolios
-                await db.user.delete({ where: { id: user.id } }); // public.Users
-            });
-
-            // Step 2: Only if transaction succeeds, delete from Auth Provider
-            await this.authService.deleteAuthUser(authUser);
-
+            await this.databaseService.user.delete({ where: { id: user.id } }); // cascade delete
+            await this.authService.deleteAuthUser(authUser); // delete user from auth provider
+            await this.portfolioService.delCachedAll(user.id);
             await this.deleteCachedUserByAuthUserId(authUser.id);
         } catch (err) {
             this.logger.error(`Failed to delete user ${user.id}: ${err}`);
