@@ -4,39 +4,50 @@ import {
     getWalletType,
     normalizeWalletAddress,
 } from '@/wallet/utils';
-import { ChainType, Wallet, WalletType } from '@prisma/client';
+import { ChainType, Prisma, Wallet, WalletType } from '@prisma/client';
 import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
-import * as process from 'node:process';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class WalletService {
     private readonly logger: AppLoggerService;
+    private readonly isTestingMode: boolean;
+    private readonly testingCacheTTL: number;
     constructor(
         private readonly databaseService: DatabaseService,
         private readonly cacheService: CacheService,
+        private readonly configService: ConfigService,
     ) {
         this.logger = new AppLoggerService(WalletService.name);
+        this.isTestingMode = this.configService.get('MODE') === 'testing';
+        this.testingCacheTTL = 5;
     }
+
     async findOrCreate(
         walletAddress: string,
-        portfolioId?: string,
+        db?: Prisma.TransactionClient,
     ): Promise<Wallet> {
         const { address, chainType } =
             this.extractAddressAndChainType(walletAddress);
-        const existingWallet: Wallet | undefined =
-            await this.findByAddress(address);
-        if (existingWallet) {
-            return this.handleExistingWallet(
-                existingWallet,
-                address,
-                portfolioId,
-            );
+        let prisma: DatabaseService | Prisma.TransactionClient;
+        if (!db) {
+            prisma = this.databaseService;
+            /*const wallet: Wallet | undefined =
+                await this.getCachedWalletByAddress(address);*/
+            const wallet: Wallet | undefined =
+                await this.findByAddress(address);
+            if (wallet) {
+                this.logger.log(
+                    `Wallet with address ${address} already exists in cache.`,
+                );
+                return wallet;
+            }
+        } else {
+            prisma = db;
         }
-        // Determine the wallet type based on address and chain type
-
         const startTime = Date.now();
         const walletType: WalletType = await getWalletType(address, chainType);
         const endTime = Date.now();
@@ -44,26 +55,43 @@ export class WalletService {
             `Wallet type determination took ${endTime - startTime}ms`,
         );
         this.logger.log(
-            `Creating wallet with address ${address} and type ${walletType}.`,
+            `Upserting wallet with address ${address} and type ${walletType}.`,
         );
-        const wallet: Wallet = await this.databaseService.wallet.create({
-            data: {
+        const wallet: Wallet = await prisma.wallet.upsert({
+            where: {
+                address,
+            },
+            update: {},
+            create: {
                 address,
                 walletType,
                 chainType,
-                ...(portfolioId && {
-                    portfolios: { connect: { id: portfolioId } },
-                }),
             },
         });
+        if (!db) await this.cacheWalletByAddress(wallet, address); // can be dangerous if transaction fails
+        return wallet;
+    }
 
-        if (portfolioId) await this.delCacheByPortfolioId(portfolioId);
-        const cacheKey = this.cacheService.getCacheKey('wallet', wallet.id);
-        await this.cacheService.set(
-            cacheKey,
-            wallet,
-            process.env.MODE === 'testing' ? 5 : 60 * 60,
-        );
+    async findByAddress(address: string): Promise<Wallet | undefined> {
+        const pointerKey = this.cacheService.getCacheKey('wallet:address', {
+            address,
+        });
+        const walletId: string | undefined =
+            await this.cacheService.get<string>(pointerKey);
+        let wallet: Wallet | undefined;
+        if (walletId) {
+            wallet = await this.findById(walletId);
+        } else {
+            wallet =
+                (await this.databaseService.wallet.findFirst({
+                    where: { address },
+                })) ?? undefined;
+            if (wallet) await this.cacheWalletByAddress(wallet, address);
+        }
+        if (!wallet) {
+            this.logger.warn(`Wallet with address ${address} not found`);
+            return undefined;
+        }
         return wallet;
     }
 
@@ -87,65 +115,9 @@ export class WalletService {
         await this.cacheService.set(
             cacheKey,
             wallet,
-            process.env.MODE === 'testing' ? 5 : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
         );
         return wallet;
-    }
-
-    async findByAddress(address: string): Promise<Wallet | undefined> {
-        const pointerKey = this.cacheService.getCacheKey('wallet:address', {
-            address,
-        });
-        const walletId: string | undefined =
-            await this.cacheService.get<string>(pointerKey);
-        let wallet: Wallet | undefined;
-        if (walletId) {
-            wallet = await this.findById(walletId);
-        } else {
-            wallet =
-                (await this.databaseService.wallet.findFirst({
-                    where: { address },
-                })) ?? undefined;
-            if (wallet) await this.cacheWalletByPointerKey(wallet, pointerKey);
-        }
-        if (!wallet) {
-            this.logger.warn(`Wallet with address ${address} not found`);
-            return undefined;
-        }
-        await this.cacheService.set(
-            pointerKey,
-            wallet.id,
-            process.env.MODE === 'testing' ? 5 : 60 * 60,
-        );
-        return wallet;
-    }
-
-    async findAll(portfolioId: string): Promise<Wallet[]> {
-        const cacheKeyAll = this.cacheService.getCacheKey('wallets', {
-            portfolioId,
-        });
-        const cachedWallets: Wallet[] | undefined =
-            await this.cacheService.get(cacheKeyAll);
-        if (cachedWallets) {
-            return cachedWallets;
-        }
-        const wallets: Wallet[] | null =
-            await this.databaseService.wallet.findMany({
-                where: {
-                    portfolios: { some: { id: portfolioId } },
-                },
-            });
-        if (!wallets) {
-            this.logger.warn(`No wallets found for portfolio ${portfolioId}`);
-            return [];
-        }
-        //await this.cacheService.set(cacheKeyAll, wallets, 60 * 60);
-        await this.cacheService.set(
-            cacheKeyAll,
-            wallets,
-            process.env.MODE === 'testing' ? 5 : 60 * 60,
-        );
-        return wallets;
     }
 
     private extractAddressAndChainType(walletAddress: string) {
@@ -163,54 +135,38 @@ export class WalletService {
         return { address, chainType };
     }
 
-    private async handleExistingWallet(
-        wallet: Wallet,
-        address: string,
-        portfolioId?: string,
-    ): Promise<Wallet> {
-        this.logger.log(`Handling existing wallet with address ${address}.`);
-        if (portfolioId) {
-            await this.delCacheByPortfolioId(portfolioId);
-            const updatedWallet: Wallet =
-                await this.databaseService.wallet.update({
-                    where: { id: wallet.id },
-                    data: {
-                        portfolios: {
-                            connect: { id: portfolioId },
-                        },
-                    },
-                });
-            this.logger.log(
-                `Wallet with address ${address} already exists; linked to portfolio ${portfolioId}.`,
-            );
-            return updatedWallet;
-        }
-
-        this.logger.log(`Wallet with address ${address} already exists.`);
-        return wallet;
-    }
-
-    private async cacheWalletByPointerKey(wallet: Wallet, pointerKey: string) {
+    private async cacheWalletByAddress(wallet: Wallet, address: string) {
+        const pointerKey = this.cacheService.getCacheKey('wallet:address', {
+            address,
+        });
         const canonicalKey = this.cacheService.getCacheKey('wallet', wallet.id);
-        //await this.cacheService.set(pointerKey, wallet.id, 60 * 60);
-        //await this.cacheService.set(canonicalKey, wallet, 60 * 60);
         await this.cacheService.set(
             pointerKey,
             wallet.id,
-            process.env.MODE === 'testing' ? 5 : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
         );
         await this.cacheService.set(
             canonicalKey,
             wallet,
-            process.env.MODE === 'testing' ? 5 : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
         );
     }
 
-    // Clear cache for the all wallets in the portfolio
-    private async delCacheByPortfolioId(portfolioId: string) {
-        const cacheKeyAll = this.cacheService.getCacheKey('wallets', {
-            portfolioId,
+    private async getCachedWalletByAddress(
+        address: string,
+    ): Promise<Wallet | undefined> {
+        const pointerKey = this.cacheService.getCacheKey('wallet:address', {
+            address,
         });
-        await this.cacheService.del(cacheKeyAll);
+        const walletId = await this.cacheService.get<string>(pointerKey);
+        if (!walletId) {
+            return undefined;
+        }
+        const canonicalKey = this.cacheService.getCacheKey('wallet', walletId);
+        const cachedWallet = await this.cacheService.get<Wallet>(canonicalKey);
+        if (!cachedWallet) {
+            return undefined;
+        }
+        return cachedWallet;
     }
 }
