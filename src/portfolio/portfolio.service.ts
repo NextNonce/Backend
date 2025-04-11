@@ -1,15 +1,17 @@
 import {
     ForbiddenException,
+    forwardRef,
+    Inject,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
-import { Portfolio, PortfolioAccess, Wallet, Prisma } from '@prisma/client';
+import { Portfolio, PortfolioAccess, Prisma } from '@prisma/client';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
-import { WalletService } from '@/wallet/wallet.service';
+import { PortfolioWalletService } from '@/portfolio-wallet/portfolio-wallet.service';
 
 @Injectable()
 export class PortfolioService {
@@ -17,7 +19,8 @@ export class PortfolioService {
     constructor(
         private readonly databaseService: DatabaseService,
         private readonly cacheService: CacheService,
-        private readonly walletService: WalletService,
+        @Inject(forwardRef(() => PortfolioWalletService))
+        private readonly portfolioWalletService: PortfolioWalletService,
     ) {
         this.logger = new AppLoggerService(PortfolioService.name);
     }
@@ -119,57 +122,25 @@ export class PortfolioService {
         return portfolio;
     }
 
-    async findWallets(id: string, userId: string): Promise<Wallet[]> {
-        await this.findOneAndVerifyAccess({
-            id,
-            userId,
-            requireOwnership: false,
-        });
-        return await this.walletService.findAll(id);
-    }
-
-    async addWallet(
-        id: string,
-        userId: string,
-        walletAddress: string,
-    ): Promise<Wallet> {
-        await this.findOneAndVerifyAccess({
-            id,
-            userId,
-            requireOwnership: true, // Only the owner can add wallets
-        });
-        this.logger.log(
-            `Adding wallet with address ${walletAddress} to portfolio ${id} of user ${userId}`,
-        );
-        return await this.walletService.findOrCreate(walletAddress, id);
-    }
-
     /*async update(id: number, updatePortfolioDto: UpdatePortfolioDto) {
         return `This action updates a #${id} portfolio`;
     }*/ // For now user can't update their only portfolio
 
-    async removeAll(
-        userId: string,
-        db?: Prisma.TransactionClient,
-    ): Promise<Portfolio[]> {
-        const prisma = db || this.databaseService;
-        const portfolios: Portfolio[] = await prisma.portfolio.findMany({
-            where: { ownerId: userId },
-        });
-        if (!portfolios || portfolios.length === 0) {
-            this.logger.warn(`No portfolios to delete for user ${userId}`);
-            return [];
-        }
-        await prisma.portfolio.deleteMany({
-            where: { ownerId: userId },
-        });
-        this.logger.log(
-            `User ${userId} deleted all his portfolios ${JSON.stringify(portfolios)}`,
-        );
+    async delCachedAll(userId: string) {
         const cacheKeyAll = this.cacheService.getCacheKey('portfolios', {
             userId,
         });
+        const cachedPortfolios: Portfolio[] | undefined =
+            await this.cacheService.get(cacheKeyAll);
+        if (!cachedPortfolios) return;
+        await Promise.all(
+            cachedPortfolios.map((portfolio) =>
+                this.portfolioWalletService.delCachedAll(portfolio.id),
+            ),
+        );
+        this.logger.log(
+            `User ${userId} deleted all his cached portfolios ${JSON.stringify(cachedPortfolios)}`,
+        );
         await this.cacheService.del(cacheKeyAll);
-        return portfolios;
     }
 }
