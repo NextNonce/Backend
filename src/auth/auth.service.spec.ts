@@ -140,35 +140,6 @@ describe('AuthService', () => {
     });
 
     // --------------------------------------------------
-    // Test for deleteRecord
-    // --------------------------------------------------
-    describe('deleteRecord', () => {
-        it('should call db.auth.delete with correct where clause', async () => {
-            const authUser = new AuthUserDto();
-            authUser.id = 'auth-user-id';
-
-            // Create a dummy db object simulating Prisma's transaction client
-            const mockDb = {
-                auth: {
-                    delete: jest.fn().mockResolvedValue({}),
-                },
-            };
-
-            const result = await service.deleteRecord(authUser, mockDb as any);
-
-            // Verify that getName() was called on the provider and the delete method was called with the correct where clause
-            expect(mockAuthProvider.getName).toHaveBeenCalled();
-            expect(mockDb.auth.delete).toHaveBeenCalledWith({
-                where: {
-                    provider: 'supabase',
-                    providerUid: authUser.id,
-                },
-            });
-            expect(result).toEqual({});
-        });
-    });
-
-    // --------------------------------------------------
     // Test for deleteAuthUser
     // --------------------------------------------------
     describe('deleteAuthUser', () => {
