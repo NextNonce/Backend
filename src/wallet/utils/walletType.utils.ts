@@ -29,7 +29,6 @@ const EVMNetworksToCheck = [
     Network.LINEA_MAINNET,
     Network.SCROLL_MAINNET,
     Network.GNOSIS_MAINNET,
-    Network.SONEIUM_MAINNET,
     Network.UNICHAIN_MAINNET,
 ];
 

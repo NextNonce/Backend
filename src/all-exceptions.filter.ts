@@ -13,7 +13,7 @@ import {
     PrismaClientValidationError,
 } from '@prisma/client/runtime/library';
 import { ConfigService } from '@nestjs/config';
-import { SentryExceptionCaptured } from '@sentry/nestjs';
+//import { SentryExceptionCaptured } from '@sentry/nestjs';
 
 type MyResponseObj = {
     statusCode: number;
