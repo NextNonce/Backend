@@ -1,22 +1,19 @@
 import {
-    Body,
     Controller,
     Get,
     Param,
-    Post,
+    //Post,
     UsePipes,
     ValidationPipe,
 } from '@nestjs/common';
 import { PortfolioService } from './portfolio.service';
 import { Auth } from '@/auth/decorators';
 import { CurrentUser } from '@/user/decorators/current-user.decorator';
-import { Portfolio, User, Wallet } from '@prisma/client';
+import { Portfolio, User } from '@prisma/client';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { PortfolioIdentifierDto } from '@/portfolio/dto/portfolio-identifier.dto';
 import { PortfolioDto } from '@/portfolio/dto/portfolio.dto';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { WalletIdentifierDto } from '@/wallet/dto/wallet-identifier.dto';
-import { WalletDto } from '@/wallet/dto/wallet.dto';
 
 @ApiTags('portfolios')
 @Auth()
@@ -64,43 +61,6 @@ export class PortfolioController {
                 requireOwnership: false,
             });
         return PortfolioDto.fromModel(portfolio);
-    }
-
-    @Get(':id/wallets')
-    @ApiOkResponse({
-        description: 'List of wallets in the portfolio',
-        type: WalletDto,
-        isArray: true,
-    })
-    async findWallets(
-        @CurrentUser() user: User,
-        @Param() portfolioIdentifierDto: PortfolioIdentifierDto,
-    ): Promise<WalletDto[]> {
-        const wallets: Wallet[] = await this.portfolioService.findWallets(
-            portfolioIdentifierDto.id,
-            user.id,
-        );
-        return wallets.map(
-            (wallet: Wallet): WalletDto => WalletDto.fromModel(wallet),
-        );
-    }
-
-    @Post(':id/wallets')
-    @ApiOkResponse({
-        description: 'Wallet created',
-        type: WalletDto,
-    })
-    async addWallet(
-        @CurrentUser() user: User,
-        @Param() portfolioIdentifierDto: PortfolioIdentifierDto,
-        @Body() walletIdentifierDto: WalletIdentifierDto,
-    ): Promise<WalletDto> {
-        const wallet: Wallet = await this.portfolioService.addWallet(
-            portfolioIdentifierDto.id,
-            user.id,
-            walletIdentifierDto.address,
-        );
-        return WalletDto.fromModel(wallet);
     }
 
     /*@Delete(':id')
