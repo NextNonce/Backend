@@ -1,11 +1,20 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import {
+    Controller,
+    Get,
+    Param,
+    UsePipes,
+    ValidationPipe,
+} from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { WalletIdentifierDto } from './dto/wallet-identifier.dto';
 import { WalletDto } from '@/wallet/dto/wallet.dto';
 import { Wallet } from '@prisma/client';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Auth } from '@/auth/decorators';
 
 @ApiTags('wallets')
+@Auth()
+@UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 @Controller('wallets')
 export class WalletController {
     constructor(private readonly walletService: WalletService) {}

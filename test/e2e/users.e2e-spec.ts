@@ -4,6 +4,8 @@ import { authProvider } from '../setup/auth';
 import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types';
 
+jest.setTimeout(15000);
+
 describe('Users Endpoints (e2e)', () => {
     let app: INestApplication<App>;
     let token: string;

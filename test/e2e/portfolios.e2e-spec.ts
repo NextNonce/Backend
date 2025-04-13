@@ -5,6 +5,8 @@ import { App } from 'supertest/types';
 import { Portfolio } from '@prisma/client';
 import { authProvider } from '../setup/auth';
 
+jest.setTimeout(15000);
+
 describe('Portfolios Endpoints (e2e)', () => {
     let app: INestApplication<App>;
     let token: string;
@@ -13,6 +15,10 @@ describe('Portfolios Endpoints (e2e)', () => {
         '0x0ac7231cc1994fd98f80db1c58efba712fb72f1a';
     const validAddressOfSmartEVMBaseWallet =
         '0x1e4eed8fd57DFBaaE060F894582eC0183c5D6e38';
+    /*const validAddressOfSimpleEVMWallet =
+        '0x3ccc596a2be298ff9e94bc583bc1de6429cd0f0a';
+    const validAddressOfSmartEVMBaseWallet =
+        '0x0000000000000068f116a894984e2db1123eb395';*/
 
     beforeAll(async () => {
         ({ app, token } = await setupAppWithRegistration());
@@ -140,16 +146,18 @@ describe('Portfolios Endpoints (e2e)', () => {
         const res = await request(app.getHttpServer())
             .post(`/v1/portfolios/${portfolioId}/wallets`)
             .set('Authorization', `Bearer ${token}`)
-            .send({ address: validAddressOfSimpleEVMWallet })
+            .send({ address: validAddressOfSimpleEVMWallet, name: 'Main wallet' })
             .expect(201);
 
         const wallet = res.body;
         expect(wallet).toHaveProperty('address');
+        expect(wallet).toHaveProperty('name');
         expect(wallet).toHaveProperty('walletType');
         expect(wallet).toHaveProperty('chainType');
         expect(wallet.address.length).toBe(
             validAddressOfSimpleEVMWallet.length,
         );
+        expect(wallet.name).toBe('Main wallet');
         expect(wallet.walletType).toBe('SIMPLE');
         expect(wallet.chainType).toBe('EVM');
     });
@@ -166,9 +174,11 @@ describe('Portfolios Endpoints (e2e)', () => {
         expect(wallet).toHaveProperty('address');
         expect(wallet).toHaveProperty('walletType');
         expect(wallet).toHaveProperty('chainType');
+        expect(wallet).toHaveProperty('name');
         expect(wallet.address.length).toBe(
             validAddressOfSmartEVMBaseWallet.length,
         );
+        expect(wallet.name).toBe(null);
         expect(wallet.walletType).toBe('SMART');
         expect(wallet.chainType).toBe('EVM');
     });
@@ -269,7 +279,7 @@ describe('Portfolios Endpoints (e2e)', () => {
         const wallets = res.body;
         expect(Array.isArray(wallets)).toBe(true);
         expect(wallets.length).toBe(2);
-        //expect(wallets[0].address).toBe(validAddressOfSimpleEVMWallet);
-        //expect(wallets[1].address).toBe(validAddressOfSmartEVMBaseWallet);
+        expect(wallets[0].address.toLowerCase()).toBe(validAddressOfSimpleEVMWallet.toLowerCase());
+        expect(wallets[1].address.toLowerCase()).toBe(validAddressOfSmartEVMBaseWallet.toLowerCase());
     });
 });

@@ -11,6 +11,7 @@ import { WalletModule } from './wallet/wallet.module';
 import { ConfigModule } from '@nestjs/config';
 //import { SentryModule } from '@sentry/nestjs/setup';
 //import { DebugController } from './debug.controller';
+import { PortfolioWalletModule } from './portfolio-wallet/portfolio-wallet.module';
 
 @Module({
     imports: [
@@ -26,6 +27,7 @@ import { ConfigModule } from '@nestjs/config';
             isGlobal: true,
             envFilePath: '.env',
         }),
+        PortfolioWalletModule,
     ],
     controllers: [AppController /*DebugController*/],
     providers: [AppService],

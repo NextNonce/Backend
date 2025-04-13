@@ -9,11 +9,9 @@ class AuthProvider {
         this.supabase = new SupabaseClient(supabaseUrl, supabaseKey);
     }
     async registerTestUser() {
-        const email = `testuser_${Date.now()}@example.com`; // Unique email for each test run
+        const randomNumber = Math.floor(Math.random() * 100000);
+        const email = `testuser_${Date.now()}_${randomNumber}@nextnonce.com`; // Unique email for each test run
         const password = 'testpassword123';
-        console.log(
-            `Registering test user in supabase with email: ${email}, password: ${password}`,
-        );
         const { data, error } = await this.supabase.auth.signUp({
             email,
             password,

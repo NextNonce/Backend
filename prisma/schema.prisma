@@ -43,7 +43,7 @@ model Auth {
     provider    String
     userId      String?  @unique
     providerUid String   @unique
-    user        User?    @relation(fields: [userId], references: [id])
+    user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -63,16 +63,44 @@ model User {
     @@map("users")
 }
 
+model Portfolio {
+    id              String            @id @default(uuid())
+    name            String
+    ownerId         String
+    owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    portfolioAccess PortfolioAccess   @default(PRIVATE)
+    createdAt       DateTime          @default(now())
+    updatedAt       DateTime          @updatedAt
+    walletLinks     PortfolioWallet[]
+
+    @@map("portfolios")
+}
+
+model PortfolioWallet {
+    id          String    @id @default(uuid())
+    name        String?
+    portfolioId String
+    portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+    walletId    String
+    wallet      Wallet    @relation(fields: [walletId], references: [id])
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    @@unique([portfolioId, walletId])
+    @@unique([portfolioId, name])
+    @@map("portfolios_wallets")
+}
+
 model Wallet {
-    id             String      @id @default(uuid())
-    address        String      @unique
+    id             String            @id @default(uuid())
+    address        String            @unique
     walletType     WalletType
     chainType      ChainType
-    createdAt      DateTime    @default(now())
-    updatedAt      DateTime    @updatedAt
+    createdAt      DateTime          @default(now())
+    updatedAt      DateTime          @updatedAt
     derivationInfo Json? // for Bitcoin-like {"derivation": "single | hd", type: "legacy | segwit | nativeSegwit | taproot"}
-    portfolios     Portfolio[] // many-to-many with Portfolios
     watchlists     Watchlist[] // many-to-many with Watchlists
+    portfolioLinks PortfolioWallet[]
 
     @@map("wallets")
 }
@@ -128,19 +156,6 @@ model TokenMetadata {
     UnifiedToken UnifiedToken?
 
     @@map("token_metadata")
-}
-
-model Portfolio {
-    id              String          @id @default(uuid())
-    name            String
-    ownerId         String
-    owner           User            @relation(fields: [ownerId], references: [id])
-    portfolioAccess PortfolioAccess @default(PRIVATE)
-    createdAt       DateTime        @default(now())
-    updatedAt       DateTime        @updatedAt
-    wallets         Wallet[] // many-to-many with Wallets
-
-    @@map("portfolios")
 }
 
 model Watchlist {

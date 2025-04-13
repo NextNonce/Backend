@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
     IsEnum,
     IsNotEmpty,
@@ -19,7 +19,7 @@ export class CreatePortfolioDto {
     @Length(1, 24)
     name: string;
 
-    @ApiProperty({
+    @ApiPropertyOptional({
         type: 'string',
         enum: PortfolioAccess,
         default: PortfolioAccess.PRIVATE,

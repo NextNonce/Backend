@@ -1,10 +1,10 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PortfolioService } from './portfolio.service';
 import { PortfolioController } from './portfolio.controller';
-import { WalletModule } from '@/wallet/wallet.module';
+import { PortfolioWalletModule } from '@/portfolio-wallet/portfolio-wallet.module';
 
 @Module({
-    imports: [WalletModule],
+    imports: [forwardRef(() => PortfolioWalletModule)],
     controllers: [PortfolioController],
     providers: [PortfolioService],
     exports: [PortfolioService],

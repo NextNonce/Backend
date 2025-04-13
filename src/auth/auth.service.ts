@@ -54,15 +54,6 @@ export class AuthService {
         });
     }
 
-    async deleteRecord(authUser: AuthUserDto, db: Prisma.TransactionClient) {
-        return db.auth.delete({
-            where: {
-                provider: this.authProvider.getName(),
-                providerUid: authUser.id,
-            },
-        });
-    }
-
     async deleteAuthUser(authUser: AuthUserDto) {
         await this.delCachedAuthUser(authUser);
         return this.authProvider.deleteAuthUserById(authUser.id);
