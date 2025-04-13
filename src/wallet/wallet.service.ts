@@ -1,19 +1,20 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import {
-    getChainType,
-    getWalletType,
-    normalizeWalletAddress,
-} from '@/wallet/utils';
+
 import { ChainType, Prisma, Wallet, WalletType } from '@prisma/client';
 import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { ConfigService } from '@nestjs/config';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { AddressUtils } from '@/wallet/utils/address.utils';
+import { WalletTypeUtils } from '@/wallet/utils/walletType.utils';
 
 @Injectable()
 export class WalletService {
     private readonly logger: AppLoggerService;
+    private readonly addressUtils: AddressUtils;
+    private readonly walletTypeUtils: WalletTypeUtils;
     private readonly isTestingMode: boolean;
     private readonly testingCacheTTL: number;
     constructor(
@@ -22,6 +23,8 @@ export class WalletService {
         private readonly configService: ConfigService,
     ) {
         this.logger = new AppLoggerService(WalletService.name);
+        this.addressUtils = new AddressUtils();
+        this.walletTypeUtils = new WalletTypeUtils();
         this.isTestingMode = this.configService.get('MODE') === 'testing';
         this.testingCacheTTL = 5;
     }
@@ -35,41 +38,45 @@ export class WalletService {
         let prisma: DatabaseService | Prisma.TransactionClient;
         if (!db) {
             prisma = this.databaseService;
-            /*const wallet: Wallet | undefined =
-                await this.getCachedWalletByAddress(address);*/
             const wallet: Wallet | undefined =
                 await this.findByAddress(address);
             if (wallet) {
-                this.logger.log(
-                    `Wallet with address ${address} already exists in cache.`,
-                );
                 return wallet;
             }
         } else {
             prisma = db;
         }
-        const startTime = Date.now();
-        const walletType: WalletType = await getWalletType(address, chainType);
-        const endTime = Date.now();
-        this.logger.debug(
-            `Wallet type determination took ${endTime - startTime}ms`,
-        );
+        const walletType: WalletType = await this.walletTypeUtils.getWalletType(address, chainType);
         this.logger.log(
             `Upserting wallet with address ${address} and type ${walletType}.`,
         );
-        const wallet: Wallet = await prisma.wallet.upsert({
-            where: {
-                address,
-            },
-            update: {},
-            create: {
-                address,
-                walletType,
-                chainType,
-            },
-        });
-        if (!db) await this.cacheWalletByAddress(wallet, address); // can be dangerous if transaction fails
-        return wallet;
+        try {
+            const wallet: Wallet = await prisma.wallet.upsert({
+                where: {
+                    address,
+                },
+                update: {},
+                create: {
+                    address,
+                    walletType,
+                    chainType,
+                },
+            });
+            if (!db) await this.cacheWalletByAddress(wallet, address); // can be dangerous if transaction fails
+            return wallet;
+        } catch (err) {
+            const error = err as Error;
+            // Handle unique constraint error: if duplicate, fetch the existing wallet
+            if ((error as PrismaClientKnownRequestError).code === 'P2002') {
+                this.logger.warn(
+                    `Wallet with address ${address} already exists, fetching existing wallet.`,
+                );
+                const existingWallet = await this.findByAddress(address);
+                if (existingWallet) return existingWallet;
+            }
+            throw error;
+        }
+
     }
 
     async findByAddress(address: string): Promise<Wallet | undefined> {
@@ -86,7 +93,10 @@ export class WalletService {
                 (await this.databaseService.wallet.findFirst({
                     where: { address },
                 })) ?? undefined;
-            if (wallet) await this.cacheWalletByAddress(wallet, address);
+            if (wallet) {
+                this.logger.debug(`Wallet with address ${address} is fetched from DB by address`);
+                await this.cacheWalletByAddress(wallet, address);
+            }
         }
         if (!wallet) {
             this.logger.warn(`Wallet with address ${address} not found`);
@@ -112,6 +122,7 @@ export class WalletService {
             this.logger.warn(`Wallet with id ${id} not found`);
             return undefined;
         }
+        this.logger.debug(`Wallet with id ${id} and address ${wallet.address} is fetched from DB by id`);
         await this.cacheService.set(
             cacheKey,
             wallet,
@@ -121,14 +132,14 @@ export class WalletService {
     }
 
     private extractAddressAndChainType(walletAddress: string) {
-        const chainType: ChainType | undefined = getChainType(walletAddress);
+        const chainType: ChainType | undefined = this.addressUtils.getChainType(walletAddress);
         if (!chainType) {
             this.logger.error(
                 `Failed to get chain type for address: ${walletAddress}`,
             );
             throwLogged(new BadRequestException('Invalid wallet address'));
         }
-        const address: string = normalizeWalletAddress(
+        const address: string = this.addressUtils.normalizeWalletAddress(
             walletAddress,
             chainType,
         );
@@ -137,7 +148,7 @@ export class WalletService {
 
     private async cacheWalletByAddress(wallet: Wallet, address: string) {
         const pointerKey = this.cacheService.getCacheKey('wallet:address', {
-            address,
+            address
         });
         const canonicalKey = this.cacheService.getCacheKey('wallet', wallet.id);
         await this.cacheService.set(
@@ -156,7 +167,7 @@ export class WalletService {
         address: string,
     ): Promise<Wallet | undefined> {
         const pointerKey = this.cacheService.getCacheKey('wallet:address', {
-            address,
+            address
         });
         const walletId = await this.cacheService.get<string>(pointerKey);
         if (!walletId) {
