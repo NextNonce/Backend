@@ -8,7 +8,7 @@ import { throwLogged } from '@/common/helpers/error.helper';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AddressUtils } from '@/wallet/utils/address.utils';
-import { WalletTypeUtils } from '@/wallet/utils/walletType.utils';
+import { WalletTypeUtils } from '@/wallet/utils/wallet-type.utils';
 
 @Injectable()
 export class WalletService {
