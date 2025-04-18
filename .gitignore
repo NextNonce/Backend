@@ -57,6 +57,3 @@ src/generated/nestjs-dto/
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-
-# Sentry Config File
-.sentryclirc

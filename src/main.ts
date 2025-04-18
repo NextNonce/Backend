@@ -4,9 +4,11 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 import { UserInterceptor } from '@/user/interceptors/user.interceptor';
 import { ConfigService } from '@nestjs/config';
+import { AppLoggerService } from '@/app-logger/app-logger.service';
 
 async function bootstrap() {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, { logger: false, bufferLogs: true });
+    app.useLogger(app.get(AppLoggerService));
     const configService = app.get(ConfigService);
     const { httpAdapter } = app.get(HttpAdapterHost);
     app.useGlobalFilters(new AllExceptionsFilter(configService, httpAdapter));

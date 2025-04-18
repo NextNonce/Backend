@@ -9,13 +9,10 @@ import { UserModule } from '@/user/user.module';
 import { PortfolioModule } from '@/portfolio/portfolio.module';
 import { WalletModule } from './wallet/wallet.module';
 import { ConfigModule } from '@nestjs/config';
-//import { SentryModule } from '@sentry/nestjs/setup';
-//import { DebugController } from './debug.controller';
-import { PortfolioWalletModule } from './portfolio-wallet/portfolio-wallet.module';
+import { PortfolioWalletModule } from '@/portfolio-wallet/portfolio-wallet.module';
 
 @Module({
     imports: [
-        //SentryModule.forRoot(),
         AppLoggerModule,
         DatabaseModule,
         CacheModule,
@@ -29,8 +26,7 @@ import { PortfolioWalletModule } from './portfolio-wallet/portfolio-wallet.modul
         }),
         PortfolioWalletModule,
     ],
-    controllers: [AppController /*DebugController*/],
+    controllers: [AppController],
     providers: [AppService],
-    //exports: [AppService],
 })
 export class AppModule {}
