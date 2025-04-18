@@ -13,7 +13,6 @@ import {
     PrismaClientValidationError,
 } from '@prisma/client/runtime/library';
 import { ConfigService } from '@nestjs/config';
-//import { SentryExceptionCaptured } from '@sentry/nestjs';
 
 type MyResponseObj = {
     statusCode: number;
@@ -36,7 +35,6 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
             this.configService.get<string>('NODE_ENV') !== 'production';
     }
 
-    //@SentryExceptionCaptured()
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
         const response = ctx.getResponse<Response>();
