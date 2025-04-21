@@ -5,6 +5,8 @@ import { createMockDatabaseService } from '../../test/helpers/database.mock';
 import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
 import { mockCacheService } from '../../test/helpers/cache.mock';
+import { mockConfigService} from '../../test/helpers/config.mock';
+import { ConfigService } from '@nestjs/config';
 
 describe('WalletController', () => {
     let controller: WalletController;
@@ -19,6 +21,7 @@ describe('WalletController', () => {
                 WalletService,
                 { provide: DatabaseService, useValue: mockDatabaseService },
                 { provide: CacheService, useValue: mockCacheService },
+                { provide: ConfigService, useValue: mockConfigService },
             ],
         }).compile();
 
