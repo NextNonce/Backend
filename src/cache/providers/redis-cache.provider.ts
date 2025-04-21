@@ -37,8 +37,9 @@ export class RedisCacheProvider
             host: host,
             port: port,
             password: password,
+            tls: {},
             // lazyConnect: false is default, no need to set
-            // connectionName: `myAppName-${process.pid}`, // Optional: Helps identify connections in Redis MONITOR
+            connectionName: `myAppName-${process.pid}`, // Optional: Helps identify connections in Redis MONITOR
             connectTimeout: 5000, // Example: 10 second timeout for connection attempt
             maxRetriesPerRequest: 3, // Example: Don't retry commands indefinitely if connection drops
             retryStrategy: (times) => {
