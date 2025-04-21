@@ -134,9 +134,14 @@ export class PortfolioService {
             await this.cacheService.get(cacheKeyAll);
         if (!cachedPortfolios) return;
         await Promise.all(
-            cachedPortfolios.map((portfolio) =>
-                this.portfolioWalletService.delCachedAll(portfolio.id),
-            ),
+            cachedPortfolios.map(async (portfolio) => {
+                // first delete the portfolio key
+                await this.cacheService.del(
+                    this.cacheService.getCacheKey('portfolio', portfolio.id),
+                );
+                // then delete all the wallet‑cache for that portfolio
+                await this.portfolioWalletService.delCachedAll(portfolio.id);
+            }),
         );
         this.logger.log(
             `User ${userId} deleted all his cached portfolios ${JSON.stringify(cachedPortfolios)}`,
