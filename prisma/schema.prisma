@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
     provider = "prisma-client-js"
 }
@@ -11,19 +5,166 @@ generator client {
 generator nestjsDto {
     provider                        = "prisma-generator-nestjs-dto"
     output                          = "../src/generated/nestjs-dto"
-    outputToNestJsResourceStructure = "true"
     classValidation                 = "true"
+    outputToNestJsResourceStructure = "true"
+    prettier                        = "true"
     requiredResponseApiProperty     = "true"
-    prettier                        = "true" // Auto-format output
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
+}
+
+enum WalletType {
+    SIMPLE
+    SMART
+}
+
+enum ChainType {
+    EVM
+    CAIROVM
+    //SVM
+    //MOVEVM
+    //BITCOIN
+    //TONVM
+    //TRONVM
+}
+
+enum PortfolioAccess {
+    PRIVATE
+    PUBLIC
+    UNLISTED
+}
+
+model Auth {
+    id          String   @id @default(uuid())
+    provider    String
+    userId      String?  @unique
+    providerUid String   @unique
+    user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@unique([provider, providerUid])
+    @@map("auths")
 }
 
 model User {
+    id         String      @id @default(uuid())
+    email      String?     @unique
+    auth       Auth?
+    watchlist  Watchlist?
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
+    portfolios Portfolio[]
+
+    @@map("users")
+}
+
+model Portfolio {
+    id              String            @id @default(uuid())
+    name            String
+    ownerId         String
+    owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    portfolioAccess PortfolioAccess   @default(PRIVATE)
+    createdAt       DateTime          @default(now())
+    updatedAt       DateTime          @updatedAt
+    walletLinks     PortfolioWallet[]
+
+    @@map("portfolios")
+}
+
+model PortfolioWallet {
+    id          String    @id @default(uuid())
+    name        String?
+    portfolioId String
+    portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+    walletId    String
+    wallet      Wallet    @relation(fields: [walletId], references: [id])
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    @@unique([portfolioId, walletId])
+    @@unique([portfolioId, name])
+    @@map("portfolios_wallets")
+}
+
+model Wallet {
+    id             String            @id @default(uuid())
+    address        String            @unique
+    walletType     WalletType
+    chainType      ChainType
+    createdAt      DateTime          @default(now())
+    updatedAt      DateTime          @updatedAt
+    derivationInfo Json? // for Bitcoin-like {"derivation": "single | hd", type: "legacy | segwit | nativeSegwit | taproot"}
+    watchlists     Watchlist[] // many-to-many with Watchlists
+    portfolioLinks PortfolioWallet[]
+
+    @@map("wallets")
+}
+
+model Chain {
+    id        String    @id @default(uuid())
+    name      String    @unique
+    chainType ChainType
+    tokens    Token[] // One-to-many relation to tokens
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    @@map("chains")
+}
+
+model UnifiedToken {
+    id              String        @id @default(uuid())
+    tokenMetadataId String        @unique
+    tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
+    tokens          Token[]
+    createdAt       DateTime      @default(now())
+    updatedAt       DateTime      @updatedAt
+
+    @@map("unified_tokens")
+}
+
+model Token {
+    id              String        @id @default(uuid())
+    chainId         String
+    chain           Chain         @relation(fields: [chainId], references: [id])
+    address         String
+    tokenMetadataId String        @unique
+    tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
+    unifiedTokenId  String?
+    unifiedToken    UnifiedToken? @relation(fields: [unifiedTokenId], references: [id])
+    createdAt       DateTime      @default(now())
+    updatedAt       DateTime      @updatedAt
+
+    @@index([address])
+    @@map("tokens")
+}
+
+model TokenMetadata {
+    id           String        @id @default(uuid())
+    symbol       String
+    name         String
+    decimals     Int
+    logo         String
+    description  String?
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+    Token        Token?
+    UnifiedToken UnifiedToken?
+
+    @@map("token_metadata")
+}
+
+model Watchlist {
     id        String   @id @default(uuid())
+    ownerId   String   @unique
+    owner     User     @relation(fields: [ownerId], references: [id])
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+    wallets   Wallet[] // many-to-many with Wallets
+
+    @@map("watchlists")
 }

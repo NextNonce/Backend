@@ -3,11 +3,16 @@ import {
     ArgumentsHost,
     HttpStatus,
     HttpException,
+    HttpServer,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { Request, Response } from 'express';
 import { AppLoggerService } from './app-logger/app-logger.service';
-import { PrismaClientValidationError } from '@prisma/client/runtime/library';
+import {
+    PrismaClientKnownRequestError,
+    PrismaClientValidationError,
+} from '@prisma/client/runtime/library';
+import { ConfigService } from '@nestjs/config';
 
 type MyResponseObj = {
     statusCode: number;
@@ -18,8 +23,17 @@ type MyResponseObj = {
 
 @Catch()
 export class AllExceptionsFilter extends BaseExceptionFilter {
-    private readonly logger = new AppLoggerService(AllExceptionsFilter.name);
-    private readonly isDevelopment = process.env.NODE_ENV !== 'production';
+    private readonly logger: AppLoggerService;
+    private readonly isDevelopment: boolean;
+    constructor(
+        private readonly configService: ConfigService,
+        applicationRef?: HttpServer,
+    ) {
+        super(applicationRef);
+        this.logger = new AppLoggerService(AllExceptionsFilter.name);
+        this.isDevelopment =
+            this.configService.get<string>('NODE_ENV') !== 'production';
+    }
 
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
@@ -36,6 +50,20 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
             responseMessage = this.isDevelopment
                 ? exception.message.replace(/\n/g, '')
                 : 'Invalid request data';
+        } else if (exception instanceof PrismaClientKnownRequestError) {
+            this.logger.error(
+                `Prisma error caught in exception filter, code: ${exception.code}, message: ${exception.message}`,
+            );
+            if (exception.code === 'P2002') {
+                statusCode = HttpStatus.CONFLICT;
+                responseMessage = 'Duplicate data not allowed'; // or a generic message
+                (
+                    exception as { suppressSuperCatch?: boolean }
+                ).suppressSuperCatch = true;
+            } else {
+                statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+                responseMessage = 'Invalid request data';
+            }
         }
 
         const myResponse: MyResponseObj = {
@@ -47,12 +75,18 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
 
         response.status(myResponse.statusCode).json(myResponse);
 
-        this.logger.error(
-            typeof responseMessage === 'string'
-                ? responseMessage
-                : JSON.stringify(responseMessage),
-            AllExceptionsFilter.name,
-        );
-        super.catch(exception, host);
+        if (!(exception as { alreadyLogged?: boolean }).alreadyLogged) {
+            this.logger.error(
+                typeof responseMessage === 'string'
+                    ? responseMessage
+                    : JSON.stringify(responseMessage),
+                AllExceptionsFilter.name,
+            );
+        }
+        if (
+            !(exception as { suppressSuperCatch?: boolean }).suppressSuperCatch
+        ) {
+            super.catch(exception, host);
+        }
     }
 }

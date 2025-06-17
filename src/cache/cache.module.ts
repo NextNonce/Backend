@@ -1,25 +1,19 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
 import { CacheService } from './cache.service';
-import IORedis from 'ioredis';
+import { ConfigModule } from '@nestjs/config';
+import { CACHE_PROVIDER } from '@/cache/interfaces/cache-provider.interface';
+import { RedisCacheProvider } from '@/cache/providers/redis-cache.provider';
 
-const CacheProvider = {
-    provide: 'REDIS_CLIENT',
-    useFactory: async () => {
-        const redis = new IORedis({
-            host: process.env.REDIS_HOST || 'localhost',
-            port: Number(process.env.REDIS_PORT) || 6379,
-            password: process.env.REDIS_PASSWORD || undefined,
-        });
-
-        // Ensure Redis is connected before injecting it
-        await redis.ping();
-
-        return redis;
-    },
-};
-
+@Global()
 @Module({
-    providers: [CacheProvider, CacheService],
-    exports: [CacheProvider, CacheService],
+    imports: [ConfigModule],
+    providers: [
+        {
+            provide: CACHE_PROVIDER, // 👈 interface token
+            useClass: RedisCacheProvider, // 👈 concrete implementation
+        },
+        CacheService,
+    ],
+    exports: [CacheService],
 })
 export class CacheModule {}
