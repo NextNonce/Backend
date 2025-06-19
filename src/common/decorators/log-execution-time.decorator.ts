@@ -1,4 +1,3 @@
-
 export function LogExecutionTime(): MethodDecorator {
     return (target, propertyKey, descriptor: PropertyDescriptor) => {
         const originalMethod = descriptor.value;

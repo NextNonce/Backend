@@ -7,7 +7,10 @@ import { ConfigService } from '@nestjs/config';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 
 async function bootstrap() {
-    const app = await NestFactory.create(AppModule, { logger: false, bufferLogs: true });
+    const app = await NestFactory.create(AppModule, {
+        logger: false,
+        bufferLogs: true,
+    });
     app.useLogger(app.get(AppLoggerService));
     const configService = app.get(ConfigService);
     const { httpAdapter } = app.get(HttpAdapterHost);

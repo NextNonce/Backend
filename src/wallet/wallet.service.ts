@@ -46,7 +46,10 @@ export class WalletService {
         } else {
             prisma = db;
         }
-        const walletType: WalletType = await this.walletTypeUtils.getWalletType(address, chainType);
+        const walletType: WalletType = await this.walletTypeUtils.getWalletType(
+            address,
+            chainType,
+        );
         this.logger.log(
             `Upserting wallet with address ${address} and type ${walletType}.`,
         );
@@ -76,7 +79,6 @@ export class WalletService {
             }
             throw error;
         }
-
     }
 
     async findByAddress(address: string): Promise<Wallet | undefined> {
@@ -94,7 +96,9 @@ export class WalletService {
                     where: { address },
                 })) ?? undefined;
             if (wallet) {
-                this.logger.debug(`Wallet with address ${address} is fetched from DB by address`);
+                this.logger.debug(
+                    `Wallet with address ${address} is fetched from DB by address`,
+                );
                 await this.cacheWalletByAddress(wallet, address);
             }
         }
@@ -122,7 +126,9 @@ export class WalletService {
             this.logger.warn(`Wallet with id ${id} not found`);
             return undefined;
         }
-        this.logger.debug(`Wallet with id ${id} and address ${wallet.address} is fetched from DB by id`);
+        this.logger.debug(
+            `Wallet with id ${id} and address ${wallet.address} is fetched from DB by id`,
+        );
         await this.cacheService.set(
             cacheKey,
             wallet,
@@ -132,7 +138,8 @@ export class WalletService {
     }
 
     private extractAddressAndChainType(walletAddress: string) {
-        const chainType: ChainType | undefined = this.addressUtils.getChainType(walletAddress);
+        const chainType: ChainType | undefined =
+            this.addressUtils.getChainType(walletAddress);
         if (!chainType) {
             this.logger.error(
                 `Failed to get chain type for address: ${walletAddress}`,
@@ -148,7 +155,7 @@ export class WalletService {
 
     private async cacheWalletByAddress(wallet: Wallet, address: string) {
         const pointerKey = this.cacheService.getCacheKey('wallet:address', {
-            address
+            address,
         });
         const canonicalKey = this.cacheService.getCacheKey('wallet', wallet.id);
         await this.cacheService.set(
@@ -167,7 +174,7 @@ export class WalletService {
         address: string,
     ): Promise<Wallet | undefined> {
         const pointerKey = this.cacheService.getCacheKey('wallet:address', {
-            address
+            address,
         });
         const walletId = await this.cacheService.get<string>(pointerKey);
         if (!walletId) {

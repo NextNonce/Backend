@@ -21,7 +21,10 @@ describe('PortfolioController', () => {
                 PortfolioService,
                 { provide: DatabaseService, useValue: mockDatabaseService },
                 { provide: CacheService, useValue: mockCacheService },
-                { provide: PortfolioWalletService, useValue: mockPortfolioWalletService },
+                {
+                    provide: PortfolioWalletService,
+                    useValue: mockPortfolioWalletService,
+                },
             ],
         }).compile();
 

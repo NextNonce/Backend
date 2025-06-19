@@ -48,7 +48,9 @@ export class AddressUtils {
         try {
             return getChecksumAddress(address.toLowerCase());
         } catch {
-            this.logger.warn(`Failed to get checksum Starknet address: ${address}`);
+            this.logger.warn(
+                `Failed to get checksum Starknet address: ${address}`,
+            );
             throwLogged(new BadRequestException('Invalid address'));
         }
     }

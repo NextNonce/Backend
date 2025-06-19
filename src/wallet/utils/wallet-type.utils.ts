@@ -35,15 +35,22 @@ export class WalletTypeUtils {
         this.ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY!;
         if (!this.ALCHEMY_API_KEY) {
             this.logger.error('Missing Alchemy API key');
-            throwLogged(new InternalServerErrorException('Internal server error'));
+            throwLogged(
+                new InternalServerErrorException('Internal server error'),
+            );
         }
         // Initialize Alchemy instances immediately
-        this.alchemyInstances = this.createAlchemyInstances(this.ALCHEMY_API_KEY);
+        this.alchemyInstances = this.createAlchemyInstances(
+            this.ALCHEMY_API_KEY,
+        );
     }
 
     // Private method to create an Alchemy instance for each network
     private createAlchemyInstances(apiKey: string): Record<Network, Alchemy> {
-        const instances: Record<Network, Alchemy> = {} as Record<Network, Alchemy>;
+        const instances: Record<Network, Alchemy> = {} as Record<
+            Network,
+            Alchemy
+        >;
         for (const network of this.EVMNetworksToCheck) {
             instances[network] = new Alchemy({
                 apiKey,
@@ -57,7 +64,8 @@ export class WalletTypeUtils {
     public async isEVMSmartContract(address: string): Promise<boolean> {
         const checks = this.EVMNetworksToCheck.map(async (network) => {
             try {
-                const code = await this.alchemyInstances[network].core.getCode(address);
+                const code =
+                    await this.alchemyInstances[network].core.getCode(address);
                 return code !== '0x' && code.length > 2;
             } catch (error) {
                 this.logger.warn(
@@ -87,7 +95,9 @@ export class WalletTypeUtils {
                 return WalletType.SMART; // All CairoVM addresses are smart contracts
             default:
                 this.logger.error(`Unhandled ChainType`);
-                throwLogged(new InternalServerErrorException('Internal server error'));
+                throwLogged(
+                    new InternalServerErrorException('Internal server error'),
+                );
         }
     }
 }
