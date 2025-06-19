@@ -169,7 +169,7 @@ model TokenPrice {
     id        String   @id @default(uuid())
     tokenId   String
     token     Token    @relation(fields: [tokenId], references: [id])
-    priceUsd  Decimal
+    priceUsd  Decimal  @db.Decimal(38, 18)
     timestamp DateTime @default(now())
 
     @@unique([tokenId, timestamp])
@@ -181,7 +181,7 @@ model WalletBalance {
     id         String   @id @default(uuid())
     walletId   String
     wallet     Wallet   @relation(fields: [walletId], references: [id])
-    balanceUsd Decimal
+    balanceUsd Decimal  @db.Decimal(38, 18)
     timestamp  DateTime @default(now())
 
     @@unique([walletId, timestamp])
@@ -192,7 +192,7 @@ model PortfolioBalance {
     id          String    @id @default(uuid())
     portfolioId String
     portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
-    balanceUsd  Decimal
+    balanceUsd  Decimal   @db.Decimal(38, 18)
     timestamp   DateTime  @default(now())
 
     @@unique([portfolioId, timestamp])
@@ -205,7 +205,7 @@ model WalletToken {
     wallet    Wallet   @relation(fields: [walletId], references: [id])
     tokenId   String
     token     Token    @relation(fields: [tokenId], references: [id])
-    balance   Decimal
+    balance   Decimal  @db.Decimal(38, 18)
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
