@@ -135,7 +135,7 @@ model Token {
     id              String        @id @default(uuid())
     chainId         String
     chain           Chain         @relation(fields: [chainId], references: [id])
-    address         String
+    address         String? // Could be null for native tokens
     tokenMetadataId String        @unique
     tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
     unifiedTokenId  String?
