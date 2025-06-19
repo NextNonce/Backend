@@ -64,14 +64,15 @@ model User {
 }
 
 model Portfolio {
-    id              String            @id @default(uuid())
+    id              String             @id @default(uuid())
     name            String
     ownerId         String
-    owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-    portfolioAccess PortfolioAccess   @default(PRIVATE)
-    createdAt       DateTime          @default(now())
-    updatedAt       DateTime          @updatedAt
+    owner           User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    portfolioAccess PortfolioAccess    @default(PRIVATE)
+    createdAt       DateTime           @default(now())
+    updatedAt       DateTime           @updatedAt
     walletLinks     PortfolioWallet[]
+    balances        PortfolioBalance[]
 
     @@map("portfolios")
 }
@@ -102,6 +103,7 @@ model Wallet {
     watchlists     Watchlist[] // many-to-many with Watchlists
     portfolioLinks PortfolioWallet[]
     tokenLinks     WalletToken[]
+    balances       WalletBalance[]
 
     @@index([address])
     @@map("wallets")
@@ -173,6 +175,28 @@ model TokenPrice {
     @@unique([tokenId, timestamp])
     @@index([timestamp])
     @@map("token_prices")
+}
+
+model WalletBalance {
+    id         String   @id @default(uuid())
+    walletId   String
+    wallet     Wallet   @relation(fields: [walletId], references: [id])
+    balanceUsd Decimal
+    timestamp  DateTime @default(now())
+
+    @@unique([walletId, timestamp])
+    @@map("wallet_balances")
+}
+
+model PortfolioBalance {
+    id          String    @id @default(uuid())
+    portfolioId String
+    portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
+    balanceUsd  Decimal
+    timestamp   DateTime  @default(now())
+
+    @@unique([portfolioId, timestamp])
+    @@map("portfolio_balances")
 }
 
 model WalletToken {
