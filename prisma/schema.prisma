@@ -101,7 +101,9 @@ model Wallet {
     derivationInfo Json? // for Bitcoin-like {"derivation": "single | hd", type: "legacy | segwit | nativeSegwit | taproot"}
     watchlists     Watchlist[] // many-to-many with Watchlists
     portfolioLinks PortfolioWallet[]
+    tokenLinks     WalletToken[]
 
+    @@index([address])
     @@map("wallets")
 }
 
@@ -136,9 +138,12 @@ model Token {
     tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
     unifiedTokenId  String?
     unifiedToken    UnifiedToken? @relation(fields: [unifiedTokenId], references: [id])
+    prices          TokenPrice[]
+    walletLinks     WalletToken[]
     createdAt       DateTime      @default(now())
     updatedAt       DateTime      @updatedAt
 
+    @@unique([chainId, address])
     @@index([address])
     @@map("tokens")
 }
@@ -156,6 +161,32 @@ model TokenMetadata {
     UnifiedToken UnifiedToken?
 
     @@map("token_metadata")
+}
+
+model TokenPrice {
+    id        String   @id @default(uuid())
+    tokenId   String
+    token     Token    @relation(fields: [tokenId], references: [id])
+    priceUsd  Decimal
+    timestamp DateTime @default(now())
+
+    @@unique([tokenId, timestamp])
+    @@index([timestamp])
+    @@map("token_prices")
+}
+
+model WalletToken {
+    id        String   @id @default(uuid())
+    walletId  String
+    wallet    Wallet   @relation(fields: [walletId], references: [id])
+    tokenId   String
+    token     Token    @relation(fields: [tokenId], references: [id])
+    balance   Decimal
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([walletId, tokenId])
+    @@map("wallets_tokens")
 }
 
 model Watchlist {
