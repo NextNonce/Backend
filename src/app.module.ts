@@ -10,6 +10,7 @@ import { PortfolioModule } from '@/portfolio/portfolio.module';
 import { WalletModule } from './wallet/wallet.module';
 import { ConfigModule } from '@nestjs/config';
 import { PortfolioWalletModule } from '@/portfolio-wallet/portfolio-wallet.module';
+import { TokenModule } from './token/token.module';
 
 @Module({
     imports: [
@@ -25,6 +26,7 @@ import { PortfolioWalletModule } from '@/portfolio-wallet/portfolio-wallet.modul
             envFilePath: '.env',
         }),
         PortfolioWalletModule,
+        TokenModule,
     ],
     controllers: [AppController],
     providers: [AppService],
