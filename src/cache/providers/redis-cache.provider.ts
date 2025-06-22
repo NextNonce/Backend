@@ -159,14 +159,9 @@ export class RedisCacheProvider
 
             if (ttlInSeconds && ttlInSeconds > 0) {
                 this.logger.debug(
-                    `Setting cache with TTL: ${ttlInSeconds}s for key: ${formatMessage(key)}`,
+                    `Applying TTL: ${ttlInSeconds}s for key: ${formatMessage(key)}`,
                 );
-                await this.redisClient.setex(key, ttlInSeconds, stringValue);
-            } else {
-                this.logger.debug(
-                    `Setting cache for key: ${formatMessage(key)} without TTL`,
-                );
-                await this.redisClient.set(key, stringValue);
+                multi.expire(key, ttlInSeconds);
             }
 
             // Execute both commands atomically
@@ -174,7 +169,7 @@ export class RedisCacheProvider
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
-                `Redis SET error ${redisError.message} for key ${formatMessage(key)}`,
+                `Redis HSET/EXPIRE error ${redisError.message} for key ${formatMessage(key)}`,
             );
         }
     }
@@ -192,6 +187,49 @@ export class RedisCacheProvider
             this.logger.error(
                 `Redis DEL error ${redisError.message} for key ${formatMessage(key)}`,
             );
+        }
+    }
+
+    async getWithMetadata<T>(
+        key: string,
+    ): Promise<{ value: T; ageInSeconds: number } | undefined> {
+        try {
+            // Use HGETALL to get all fields from the hash.
+            const result = await this.redisClient.hgetall(key);
+
+            // Check if the key exists and has our expected fields
+            if (!result || !result.data || !result.timestamp) {
+                this.logger.debug(
+                    `Metadata MISS for key: ${formatMessage(key)}`,
+                );
+                return undefined;
+            }
+
+            const creationTimestamp = parseInt(result.timestamp, 10);
+            const ageInSeconds = Math.round(
+                (Date.now() - creationTimestamp) / 1000,
+            );
+
+            this.logger.debug(
+                `Metadata HIT for key: ${formatMessage(key)}, Age: ${ageInSeconds}s`,
+            );
+
+            try {
+                const value = JSON.parse(result.data) as T;
+                return { value, ageInSeconds };
+            } catch (error) {
+                const parseError = error as Error;
+                this.logger.error(
+                    `Failed to parse JSON from Redis. Data: ${result.data}, Error: ${parseError.message}, Key: ${formatMessage(key)}`,
+                );
+                return undefined;
+            }
+        } catch (error) {
+            const redisError = error as Error;
+            this.logger.error(
+                `Redis GET error ${redisError.message} for key ${formatMessage(key)}`,
+            );
+            return undefined;
         }
     }
 }
