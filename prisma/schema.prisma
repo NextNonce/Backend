@@ -135,7 +135,7 @@ model Token {
     id              String        @id @default(uuid())
     chainId         String
     chain           Chain         @relation(fields: [chainId], references: [id])
-    address         String? // Could be null for native tokens
+    address         String // "native" for native tokens
     tokenMetadataId String        @unique
     tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
     unifiedTokenId  String?
@@ -155,7 +155,7 @@ model TokenMetadata {
     symbol       String
     name         String
     decimals     Int
-    logo         String
+    logo         String?
     description  String?
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @updatedAt

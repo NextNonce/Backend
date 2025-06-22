@@ -60,3 +60,4 @@ src/generated/nestjs-dto/
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 *count.sh
+/output_*
