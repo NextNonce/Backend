@@ -116,7 +116,7 @@ export class RedisCacheProvider
 
     async get<T>(key: string): Promise<T | undefined> {
         try {
-            const data = await this.redisClient.get(key);
+            const data = await this.redisClient.hget(key, 'data');
             if (data === null) {
                 // Explicitly check for null (key not found)
                 this.logger.debug(`Cache MISS for key: ${formatMessage(key)}`);
@@ -145,6 +145,18 @@ export class RedisCacheProvider
     async set<T>(key: string, value: T, ttlInSeconds?: number): Promise<void> {
         try {
             const stringValue = JSON.stringify(value);
+            const multi = this.redisClient.multi();
+
+            // 1. Set the data and timestamp fields in the hash.
+            multi.hset(key, {
+                data: stringValue,
+                timestamp: Date.now(),
+            });
+
+            this.logger.debug(
+                `Setting cache for key: ${formatMessage(key)} with timestamp`,
+            );
+
             if (ttlInSeconds && ttlInSeconds > 0) {
                 this.logger.debug(
                     `Setting cache with TTL: ${ttlInSeconds}s for key: ${formatMessage(key)}`,
@@ -156,6 +168,9 @@ export class RedisCacheProvider
                 );
                 await this.redisClient.set(key, stringValue);
             }
+
+            // Execute both commands atomically
+            await multi.exec();
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
