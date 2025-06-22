@@ -1,12 +1,34 @@
 import { TokenMetadataDto } from '@/token/dto/token-metadata.dto';
 import { TokenPriceDto } from '@/token/dto/token-price.dto';
 import { Chain, Token } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class TokenDto {
+    @ApiProperty({
+        description: 'Discriminator for the single token type.',
+        enum: ['single'], // Explicitly list the enum value
+        example: 'single',
+    })
     type: 'single';
-    address: string | null;
+    @ApiProperty({
+        type: 'string',
+        description: 'Unique identifier for the token on the chain',
+    })
+    address: string; // "native" for native tokens
+    @ApiProperty({
+        type: 'string',
+        description: 'The name of the blockchain network this token belongs to.',
+    })
     chainName: string;
+    @ApiProperty({
+        type: TokenMetadataDto,
+        description: 'Metadata of the token, including symbol, name, decimals, etc.',
+    })
     tokenMetadata: TokenMetadataDto;
+    @ApiProperty({
+        type: TokenPriceDto,
+        description: 'Current price of the token in USD.',
+    })
     tokenPrice: TokenPriceDto;
 
     constructor(
