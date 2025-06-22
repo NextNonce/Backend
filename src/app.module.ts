@@ -12,6 +12,8 @@ import { ConfigModule } from '@nestjs/config';
 import { PortfolioWalletModule } from '@/portfolio-wallet/portfolio-wallet.module';
 import { BalanceModule } from './balance/balance.module';
 import { TokenModule } from './token/token.module';
+import { MetadataModule } from './metadata/metadata.module';
+import { ChainModule } from './chain/chain.module';
 
 @Module({
     imports: [
@@ -29,6 +31,8 @@ import { TokenModule } from './token/token.module';
         PortfolioWalletModule,
         BalanceModule,
         TokenModule,
+        MetadataModule,
+        ChainModule,
     ],
     controllers: [AppController],
     providers: [AppService],
