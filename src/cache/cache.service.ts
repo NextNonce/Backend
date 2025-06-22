@@ -30,10 +30,16 @@ export class CacheService {
         await this.cacheProvider.del(key);
     }
 
+    async getWithMetadata<T>(
+        key: string,
+    ): Promise<{ value: T; ageInSeconds: number } | undefined> {
+        return await this.cacheProvider.getWithMetadata<T>(key);
+    }
+
     // Overload: for a single identifier
     public getCacheKey(domain: string, id: string): string;
 
-    // Overload: for composite key from multiple fields
+    // Overload: for a composite key from multiple fields
     public getCacheKey(domain: string, fields: Record<string, string>): string;
 
     public getCacheKey(
