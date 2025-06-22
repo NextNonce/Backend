@@ -5,4 +5,7 @@ export interface CacheProvider {
     get<T>(key: string): Promise<T | undefined>;
     set<T>(key: string, value: T, ttlInSeconds?: number): Promise<void>;
     del(key: string): Promise<void>;
+    getWithMetadata<T>(
+        key: string,
+    ): Promise<{ value: T; ageInSeconds: number } | undefined>;
 }
