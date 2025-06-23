@@ -112,7 +112,6 @@ export class RedisCacheProvider
     }
 
     // --- Implementation of CacheProvider interface ---
-    // No more connection checks needed here - assumes onModuleInit succeeded
 
     async get<T>(key: string): Promise<T | undefined> {
         try {
@@ -230,6 +229,103 @@ export class RedisCacheProvider
                 `Redis GET error ${redisError.message} for key ${formatMessage(key)}`,
             );
             return undefined;
+        }
+    }
+
+    async mget<T>(keys: string[]): Promise<(T | undefined)[]> {
+        if (keys.length === 0) {
+            return [];
+        }
+        try {
+            const multi = this.redisClient.multi();
+            keys.forEach((key) => multi.hget(key, 'data'));
+
+            // The raw result is an array of tuples, or null if the transaction failed.
+            const rawResults = await multi.exec();
+
+            // 1. Handle the case where the transaction itself fails completely.
+            if (!rawResults) {
+                this.logger.error('Redis MGET transaction failed to execute.');
+                return new Array(keys.length).fill(undefined);
+            }
+
+            this.logger.debug(`Cache MGET for ${keys.length} keys.`);
+
+            // 2. Process the array of tuples: [error, result]
+            return rawResults.map(([error, data], index) => {
+                // 3. Check for an error on each command.
+                if (error) {
+                    this.logger.error(
+                        `Error fetching key ${keys[index]} in MGET batch:`,
+                        error.message,
+                    );
+                    return undefined;
+                }
+
+                // 4. Safely check the result for the expected types.
+                if (data === null) {
+                    // This means the hash or field was not found (a cache miss)
+                    return undefined;
+                }
+
+                if (typeof data === 'string') {
+                    try {
+                        // 5. Now we can safely parse the string.
+                        return JSON.parse(data) as T;
+                    } catch (e) {
+                        this.logger.error(
+                            `Failed to parse JSON for key ${keys[index]}`,
+                            e,
+                        );
+                        return undefined;
+                    }
+                }
+
+                // This case handles unexpected return types from Redis.
+                this.logger.warn(
+                    `Unexpected data type for key ${keys[index]} in MGET batch: ${typeof data}`,
+                );
+                return undefined;
+            });
+        } catch (error) {
+            const redisError = error as Error;
+            this.logger.error(
+                `Redis MGET transaction error: ${redisError.message}`,
+            );
+            // On a total failure, return an array of undefined matching the input length.
+            return new Array(keys.length).fill(undefined);
+        }
+    }
+
+    async mset<T>(items: CacheMSetItem<T>[]): Promise<void> {
+        if (items.length === 0) {
+            return;
+        }
+        try {
+            const multi = this.redisClient.multi();
+            const now = Date.now();
+
+            // 1. Loop through all items and queue up the necessary commands.
+            items.forEach((item) => {
+                // a) Queue the HSET command with the data AND the current timestamp.
+                multi.hset(item.key, {
+                    data: JSON.stringify(item.value),
+                    timestamp: now,
+                });
+
+                // b) If a TTL is provided, queue the EXPIRE command.
+                if (item.ttlInSeconds && item.ttlInSeconds > 0) {
+                    multi.expire(item.key, item.ttlInSeconds);
+                }
+            });
+
+            // 2. Execute all queued commands atomically in a single network roundtrip.
+            await multi.exec();
+
+            this.logger.debug(`Cache MSET for ${items.length} items.`);
+        } catch (error) {
+            const redisError = error as Error;
+            this.logger.error(`Redis MSET error: ${redisError.message}`);
         }
     }
 }
