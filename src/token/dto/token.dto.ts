@@ -17,12 +17,14 @@ export class TokenDto {
     address: string; // "native" for native tokens
     @ApiProperty({
         type: 'string',
-        description: 'The name of the blockchain network this token belongs to.',
+        description:
+            'The name of the blockchain network this token belongs to.',
     })
     chainName: string;
     @ApiProperty({
         type: TokenMetadataDto,
-        description: 'Metadata of the token, including symbol, name, decimals, etc.',
+        description:
+            'Metadata of the token, including symbol, name, decimals, etc.',
     })
     tokenMetadata: TokenMetadataDto;
     @ApiProperty({

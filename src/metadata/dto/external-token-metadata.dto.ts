@@ -1,5 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ADDRESS_MAX_LENGTH, ADDRESS_MIN_LENGTH } from '@/wallet/constants/address.constants';
+import {
+    ADDRESS_MAX_LENGTH,
+    ADDRESS_MIN_LENGTH,
+} from '@/wallet/constants/address.constants';
 import { IsInt, IsString } from 'class-validator';
 import { DECIMALS_MAX, DECIMALS_MIN } from '@/token/constants/token.constants';
 
