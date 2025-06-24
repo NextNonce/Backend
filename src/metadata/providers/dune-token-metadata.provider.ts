@@ -1,10 +1,16 @@
 import { TokenMetadataProvider } from '@/metadata/interfaces/token-metadata-provider.interface';
 import { ExternalTokenMetadataDto } from '@/metadata/dto/external-token-metadata.dto';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
-import { Inject, InternalServerErrorException } from '@nestjs/common';
+import {
+    Inject,
+    InternalServerErrorException,
+    OnModuleInit,
+} from '@nestjs/common';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { DUNE_CHAIN_MAPPER } from '@/chain/mappers/dune-chain.mapper';
 import { ChainMapper } from '@/chain/interfaces/chain-mapper.interface';
+import { RateLimiterStoreAbstract } from 'rate-limiter-flexible';
+import { RateLimiterService } from '@/rate-limit/rate-limiter.service';
 
 /**
  * Represents the optional parameters for the fetchBalances function.
@@ -138,11 +144,15 @@ async function fetchBalances(
     return (await response.json()) as Promise<DuneBalancesResponse>;
 }
 
-export class DuneTokenMetadataProvider implements TokenMetadataProvider {
+export class DuneTokenMetadataProvider
+    implements TokenMetadataProvider, OnModuleInit
+{
     private readonly logger: AppLoggerService;
     private readonly DUNE_API_KEY: string;
+    private limiter: RateLimiterStoreAbstract;
 
     constructor(
+        private readonly rateLimiterService: RateLimiterService,
         @Inject(DUNE_CHAIN_MAPPER)
         private readonly duneChainMapper: ChainMapper,
     ) {
@@ -156,10 +166,26 @@ export class DuneTokenMetadataProvider implements TokenMetadataProvider {
         }
     }
 
+    async onModuleInit() {
+        this.limiter = await this.rateLimiterService.createLimiter({
+            keyPrefix: DuneTokenMetadataProvider.name, // A unique prefix for this limiter
+            points: 5, // e.g., 5 requests
+            duration: 2, // per 1 second
+        });
+    }
+
     async getByWalletAddress(
         walletAddress: string,
         chainNames: string[],
     ): Promise<ExternalTokenMetadataDto[] | undefined> {
+        await this.rateLimiterService.waitForGoAhead(
+            this.limiter,
+            `${DuneTokenMetadataProvider.name}:getByWalletAddress`,
+        );
+
+        this.logger.debug(
+            `Fetching token metadata for wallet: ${walletAddress} on chains: ${chainNames.join(', ')}`,
+        );
         const duneChainIds = chainNames.map((name) =>
             this.duneChainMapper.toExternalChainId(name),
         );
@@ -181,13 +207,11 @@ export class DuneTokenMetadataProvider implements TokenMetadataProvider {
             return undefined;
         }
         if (rawBalanceData.errors) {
-            this.logger.error(
-                `Dune API returned errors: ${JSON.stringify(rawBalanceData.errors)}`,
-            );
             for (const error of rawBalanceData.errors.token_errors || []) {
-                this.logger.error(
-                    `Error for token ${error.address} on chain ${error.chain_id}: ${error.description}`,
-                );
+                if (error.description !== 'Failed to obtain balance')
+                    this.logger.error(
+                        `Error for token ${error.address} on chain ${error.chain_id}: ${error.description}`,
+                    );
             }
         }
         if (rawBalanceData.balances && rawBalanceData.balances.length > 0) {
