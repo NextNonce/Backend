@@ -12,6 +12,13 @@ import {
     formatMessage,
 } from '@/app-logger/app-logger.service'; // Import logger
 import { throwLogged } from '@/common/helpers/error.helper';
+import { CacheMSetItem } from '@/cache/interfaces/cache-mset-item.interface';
+
+// Helper interface for our new string-based storage model
+interface CacheWrapper<T> {
+    value: T;
+    timestamp: number;
+}
 
 @Injectable()
 export class RedisCacheProvider
@@ -115,20 +122,19 @@ export class RedisCacheProvider
 
     async get<T>(key: string): Promise<T | undefined> {
         try {
-            const data = await this.redisClient.hget(key, 'data');
-            if (data === null) {
-                // Explicitly check for null (key not found)
+            const serializedData = await this.redisClient.get(key);
+            if (serializedData === null) {
                 this.logger.debug(`Cache MISS for key: ${formatMessage(key)}`);
                 return undefined;
             }
             this.logger.debug(`Cache HIT for key: ${formatMessage(key)}`);
-            // Safely parse JSON
             try {
-                return JSON.parse(data) as T;
+                const wrapper = JSON.parse(serializedData) as CacheWrapper<T>;
+                return wrapper.value; // Return only the user's data
             } catch (error) {
                 const parseError = error as Error;
                 this.logger.error(
-                    `Failed to parse JSON from Redis. Data: ${data}, Error: ${parseError.message}, Key: ${formatMessage(key)}`,
+                    `Failed to parse JSON from Redis. Data: ${serializedData}, Error: ${parseError.message}, Key: ${formatMessage(key)}`,
                 );
                 return undefined;
             }
@@ -143,28 +149,25 @@ export class RedisCacheProvider
 
     async set<T>(key: string, value: T, ttlInSeconds?: number): Promise<void> {
         try {
-            const stringValue = JSON.stringify(value);
-            const multi = this.redisClient.multi();
-
-            // 1. Set the data and timestamp fields in the hash.
-            multi.hset(key, {
-                data: stringValue,
+            const wrapper: CacheWrapper<T> = {
+                value,
                 timestamp: Date.now(),
-            });
+            };
+            const stringValue = JSON.stringify(wrapper);
 
-            this.logger.debug(
-                `Setting cache for key: ${formatMessage(key)} with timestamp`,
-            );
+            this.logger.debug(`Setting cache for key: ${formatMessage(key)}`);
 
             if (ttlInSeconds && ttlInSeconds > 0) {
-                this.logger.debug(
-                    `Applying TTL: ${ttlInSeconds}s for key: ${formatMessage(key)}`,
+                // Use SET with EX option. This is 1 atomic command for set + TTL.
+                await this.redisClient.set(
+                    key,
+                    stringValue,
+                    'EX',
+                    ttlInSeconds,
                 );
-                multi.expire(key, ttlInSeconds);
+            } else {
+                await this.redisClient.set(key, stringValue);
             }
-
-            // Execute both commands atomically
-            await multi.exec();
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
@@ -193,36 +196,23 @@ export class RedisCacheProvider
         key: string,
     ): Promise<{ value: T; ageInSeconds: number } | undefined> {
         try {
-            // Use HGETALL to get all fields from the hash.
-            const result = await this.redisClient.hgetall(key);
-
-            // Check if the key exists and has our expected fields
-            if (!result || !result.data || !result.timestamp) {
+            const serializedData = await this.redisClient.get(key);
+            if (!serializedData) {
                 this.logger.debug(
                     `Metadata MISS for key: ${formatMessage(key)}`,
                 );
                 return undefined;
             }
 
-            const creationTimestamp = parseInt(result.timestamp, 10);
+            const wrapper = JSON.parse(serializedData) as CacheWrapper<T>;
             const ageInSeconds = Math.round(
-                (Date.now() - creationTimestamp) / 1000,
+                (Date.now() - wrapper.timestamp) / 1000,
             );
 
             this.logger.debug(
                 `Metadata HIT for key: ${formatMessage(key)}, Age: ${ageInSeconds}s`,
             );
-
-            try {
-                const value = JSON.parse(result.data) as T;
-                return { value, ageInSeconds };
-            } catch (error) {
-                const parseError = error as Error;
-                this.logger.error(
-                    `Failed to parse JSON from Redis. Data: ${result.data}, Error: ${parseError.message}, Key: ${formatMessage(key)}`,
-                );
-                return undefined;
-            }
+            return { value: wrapper.value, ageInSeconds };
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
@@ -237,55 +227,25 @@ export class RedisCacheProvider
             return [];
         }
         try {
-            const multi = this.redisClient.multi();
-            keys.forEach((key) => multi.hget(key, 'data'));
-
-            // The raw result is an array of tuples, or null if the transaction failed.
-            const rawResults = await multi.exec();
-
-            // 1. Handle the case where the transaction itself fails completely.
-            if (!rawResults) {
-                this.logger.error('Redis MGET transaction failed to execute.');
-                return new Array(keys.length).fill(undefined);
-            }
-
+            const results = await this.redisClient.mget(keys);
             this.logger.debug(`Cache MGET for ${keys.length} keys.`);
 
-            // 2. Process the array of tuples: [error, result]
-            return rawResults.map(([error, data], index) => {
-                // 3. Check for an error on each command.
-                if (error) {
+            return results.map((data, index) => {
+                if (data === null) {
+                    // Cache miss for this key
+                    return undefined;
+                }
+                try {
+                    const wrapper = JSON.parse(data) as CacheWrapper<T>;
+                    return wrapper.value;
+                } catch (e) {
+                    const parseError = e as Error;
                     this.logger.error(
-                        `Error fetching key ${keys[index]} in MGET batch:`,
-                        error.message,
+                        `Failed to parse JSON for key ${keys[index]}`,
+                        parseError.message,
                     );
                     return undefined;
                 }
-
-                // 4. Safely check the result for the expected types.
-                if (data === null) {
-                    // This means the hash or field was not found (a cache miss)
-                    return undefined;
-                }
-
-                if (typeof data === 'string') {
-                    try {
-                        // 5. Now we can safely parse the string.
-                        return JSON.parse(data) as T;
-                    } catch (e) {
-                        this.logger.error(
-                            `Failed to parse JSON for key ${keys[index]}`,
-                            e,
-                        );
-                        return undefined;
-                    }
-                }
-
-                // This case handles unexpected return types from Redis.
-                this.logger.warn(
-                    `Unexpected data type for key ${keys[index]} in MGET batch: ${typeof data}`,
-                );
-                return undefined;
             });
         } catch (error) {
             const redisError = error as Error;
@@ -293,7 +253,7 @@ export class RedisCacheProvider
                 `Redis MGET transaction error: ${redisError.message}`,
             );
             // On a total failure, return an array of undefined matching the input length.
-            return new Array(keys.length).fill(undefined);
+            return new Array(keys.length).fill(undefined) as (T | undefined)[];
         }
     }
 
@@ -302,27 +262,52 @@ export class RedisCacheProvider
             return;
         }
         try {
-            const multi = this.redisClient.multi();
+            // IMPORTANT TRADE-OFF: Native MSET does NOT support per-item TTLs.
+            // To be command-effective, we sacrifice per-item TTL in this specific function.
+            // If TTL is needed, we must use a MULTI pipeline, which increases command count.
             const now = Date.now();
-
-            // 1. Loop through all items and queue up the necessary commands.
-            items.forEach((item) => {
-                // a) Queue the HSET command with the data AND the current timestamp.
-                multi.hset(item.key, {
-                    data: JSON.stringify(item.value),
-                    timestamp: now,
-                });
-
-                // b) If a TTL is provided, queue the EXPIRE command.
+            const keyValuePairs: Record<string, string> = {};
+            let usePipeline = false;
+            for (const item of items) {
                 if (item.ttlInSeconds && item.ttlInSeconds > 0) {
-                    multi.expire(item.key, item.ttlInSeconds);
+                    usePipeline = true;
+                    break; // If any item has a TTL, we must use the pipeline approach
                 }
-            });
+                const wrapper: CacheWrapper<T> = {
+                    value: item.value,
+                    timestamp: now,
+                };
+                keyValuePairs[item.key] = JSON.stringify(wrapper);
+            }
 
-            // 2. Execute all queued commands atomically in a single network roundtrip.
-            await multi.exec();
-
-            this.logger.debug(`Cache MSET for ${items.length} items.`);
+            if (usePipeline) {
+                const multi = this.redisClient.multi();
+                items.forEach((item) => {
+                    const wrapper: CacheWrapper<T> = {
+                        value: item.value,
+                        timestamp: now,
+                    };
+                    if (item.ttlInSeconds) {
+                        multi.set(
+                            item.key,
+                            JSON.stringify(wrapper),
+                            'EX',
+                            item.ttlInSeconds,
+                        );
+                    } else {
+                        multi.set(item.key, JSON.stringify(wrapper));
+                    }
+                });
+                await multi.exec();
+                this.logger.debug(
+                    `MSET: TTL detected. Using MULTI pipeline for ${items.length} items.`,
+                );
+            } else {
+                await this.redisClient.mset(keyValuePairs);
+                this.logger.debug(
+                    `MSET: No TTLs. Using native MSET for ${items.length} items.`,
+                );
+            }
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(`Redis MSET error: ${redisError.message}`);
