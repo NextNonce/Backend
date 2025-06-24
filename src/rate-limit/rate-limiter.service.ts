@@ -1,49 +1,33 @@
-import { Injectable } from '@nestjs/common';
-import { RedisClientService } from '@/common/redis/redis-client.service';
-import Redis from 'ioredis';
+import { Inject, Injectable } from '@nestjs/common';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import {
-    IRateLimiterOptions,
-    RateLimiterRedis,
-    RateLimiterRes,
+    RateLimiterRes, RateLimiterStoreAbstract,
 } from 'rate-limiter-flexible';
+import {
+    RATE_LIMITER_PROVIDER, RateLimiterProvider,
+} from '@/rate-limit/interfaces/rate-limiter-provider.interface';
+import { RateLimiterFlexibleOptions } from '@/rate-limit/types/rate-limit.types';
 
-export type RateLimiterFlexibleOptions = Omit<
-    IRateLimiterOptions,
-    'storeClient'
->;
 
 @Injectable()
 export class RateLimiterService {
-    private dedicatedClient: Redis;
     private readonly logger: AppLoggerService;
 
-    constructor(private readonly redisClientService: RedisClientService) {
+    constructor(
+        @Inject(RATE_LIMITER_PROVIDER)
+        private readonly rateLimiterProvider: RateLimiterProvider,
+    ) {
         this.logger = new AppLoggerService(RateLimiterService.name);
     }
 
     async createLimiter(
         options: RateLimiterFlexibleOptions,
-    ): Promise<RateLimiterRedis> {
-        this.logger.log(
-            `Creating a new RateLimiterRedis with keyPrefix: ${options.keyPrefix}`,
-        );
-
-        if (!this.dedicatedClient) {
-            this.dedicatedClient = await this.redisClientService.createClient(
-                'rate-limiter',
-                { enableOfflineQueue: false },
-            );
-        }
-
-        return new RateLimiterRedis({
-            storeClient: this.dedicatedClient,
-            ...options,
-        });
+    ): Promise<RateLimiterStoreAbstract> {
+        return this.rateLimiterProvider.createLimiter(options);
     }
 
     async waitForGoAhead(
-        limiter: RateLimiterRedis,
+        limiter: RateLimiterStoreAbstract,
         key: string,
     ): Promise<void> {
         let isAllowed = false;
@@ -53,9 +37,8 @@ export class RateLimiterService {
                 isAllowed = true;
             } catch (rejRes) {
                 if (rejRes instanceof Error) {
-                    // This is a Redis error, we should probably not retry indefinitely.
                     this.logger.error(
-                        `Redis error during rate limit consumption, stopping retry: ${rejRes.message}`,
+                        `Rate limit provider error during rate limit consumption, stopping retry: ${rejRes.message}`,
                     );
                     // Re-throwing here will crash the request, which is appropriate for a DB error.
                     throw rejRes;
