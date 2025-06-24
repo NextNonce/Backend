@@ -14,11 +14,13 @@ import { BalanceModule } from './balance/balance.module';
 import { TokenModule } from './token/token.module';
 import { MetadataModule } from './metadata/metadata.module';
 import { ChainModule } from './chain/chain.module';
+import { RedisModule } from './common/redis/redis.module';
 
 @Module({
     imports: [
         AppLoggerModule,
         DatabaseModule,
+        RedisModule,
         CacheModule,
         AuthModule,
         UserModule,
