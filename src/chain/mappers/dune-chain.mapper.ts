@@ -20,47 +20,34 @@ const DUNE_CHAIN_NAME_TO_NN_CHAIN_NAME: Record<string, string> = {
     scroll: 'scroll',
 };
 
+const NN_CHAIN_NAME_TO_DUNE_CHAIN_ID: Record<string, string> = {
+    ethereum: '1',
+    optimism: '10',
+    flare: '14',
+    bnb: '56',
+    gnosis: '100',
+    polygon: '137',
+    fantom: '250',
+    zksync: '324',
+    metis: '1088',
+    mantle: '5000',
+    base: '8453',
+    arbitrum: '42161',
+    avalanche: '43114',
+    linea: '59144',
+    scroll: '534352',
+};
+
 export class DuneChainMapper implements ChainMapper {
-    toChainName(externalChainName: string): string {
-        const name = DUNE_CHAIN_NAME_TO_NN_CHAIN_NAME[externalChainName];
-        if (!name) throw new Error(`Unknown Dune chain “${externalChainName}”`);
+    toChainName(externalChainId: string): string {
+        const name = DUNE_CHAIN_NAME_TO_NN_CHAIN_NAME[externalChainId];
+        if (!name) throw new Error(`Unknown Dune chain “${externalChainId}”`);
         return name;
     }
 
     toExternalChainId(nnChainName: string): string {
-        switch (nnChainName) {
-            case 'ethereum':
-                return '1';
-            case 'optimism':
-                return '10';
-            case 'flare':
-                return '14';
-            case 'bnb':
-                return '56';
-            case 'gnosis':
-                return '100';
-            case 'polygon':
-                return '137';
-            case 'fantom':
-                return '250';
-            case 'zksync':
-                return '324';
-            case 'metis':
-                return '1088';
-            case 'mantle':
-                return '5000';
-            case 'base':
-                return '8453';
-            case 'arbitrum':
-                return '42161';
-            case 'avalanche':
-                return '43114';
-            case 'linea':
-                return '59144';
-            case 'scroll':
-                return '534352';
-            default:
-                throw new Error(`Unknown NN chain “${nnChainName}”`);
-        }
+        const chainId = NN_CHAIN_NAME_TO_DUNE_CHAIN_ID[nnChainName];
+        if (!chainId) throw new Error(`Unknown NN chain “${nnChainName}”`);
+        return chainId;
     }
 }
