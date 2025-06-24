@@ -10,7 +10,7 @@ import { RedisRateLimiterProvider } from '@/rate-limit/providers/redis-rate-limi
             provide: RATE_LIMITER_PROVIDER, // Interface token for rate limiter provider
             useClass: RedisRateLimiterProvider, // Concrete implementation of the rate limiter
         },
-        RateLimiterService
+        RateLimiterService,
     ],
     exports: [RateLimiterService],
 })

@@ -1,7 +1,8 @@
+import { RateLimiterProvider } from '@/rate-limit/interfaces/rate-limiter-provider.interface';
 import {
-    RateLimiterProvider,
-} from '@/rate-limit/interfaces/rate-limiter-provider.interface';
-import { RateLimiterRedis, RateLimiterStoreAbstract } from 'rate-limiter-flexible';
+    RateLimiterRedis,
+    RateLimiterStoreAbstract,
+} from 'rate-limiter-flexible';
 import { RedisClientService } from '@/common/redis/redis-client.service';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import Redis from 'ioredis';
@@ -17,7 +18,9 @@ export class RedisRateLimiterProvider implements RateLimiterProvider {
         this.logger = new AppLoggerService(RedisRateLimiterProvider.name);
     }
 
-    async createLimiter(options: RateLimiterFlexibleOptions): Promise<RateLimiterStoreAbstract> {
+    async createLimiter(
+        options: RateLimiterFlexibleOptions,
+    ): Promise<RateLimiterStoreAbstract> {
         this.logger.log(
             `Creating a new RateLimiterRedis with keyPrefix: ${options.keyPrefix}`,
         );
@@ -34,5 +37,4 @@ export class RedisRateLimiterProvider implements RateLimiterProvider {
             ...options,
         });
     }
-
 }

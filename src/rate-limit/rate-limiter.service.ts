@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import {
-    RateLimiterRes, RateLimiterStoreAbstract,
+    RateLimiterRes,
+    RateLimiterStoreAbstract,
 } from 'rate-limiter-flexible';
 import {
-    RATE_LIMITER_PROVIDER, RateLimiterProvider,
+    RATE_LIMITER_PROVIDER,
+    RateLimiterProvider,
 } from '@/rate-limit/interfaces/rate-limiter-provider.interface';
 import { RateLimiterFlexibleOptions } from '@/rate-limit/types/rate-limit.types';
-
 
 @Injectable()
 export class RateLimiterService {
