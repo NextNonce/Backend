@@ -1,17 +1,10 @@
-import {
-    Injectable,
-    OnModuleInit,
-    OnModuleDestroy,
-    InternalServerErrorException, // To signal critical startup failure
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import IORedis from 'ioredis';
+import { Injectable } from '@nestjs/common';
 import { CacheProvider } from '../interfaces/cache-provider.interface';
 import {
     AppLoggerService,
     formatMessage,
 } from '@/app-logger/app-logger.service'; // Import logger
-import { throwLogged } from '@/common/helpers/error.helper';
+import { RedisClientService } from '@/common/redis/redis-client.service';
 import { CacheMSetItem } from '@/cache/interfaces/cache-mset-item.interface';
 
 // Helper interface for our new string-based storage model
@@ -21,101 +14,15 @@ interface CacheWrapper<T> {
 }
 
 @Injectable()
-export class RedisCacheProvider
-    implements CacheProvider, OnModuleInit, OnModuleDestroy
-{
-    private redisClient: IORedis;
+export class RedisCacheProvider implements CacheProvider {
     private readonly logger: AppLoggerService;
 
-    constructor(private configService: ConfigService) {
+    constructor(private readonly redisClientService: RedisClientService) {
         this.logger = new AppLoggerService(RedisCacheProvider.name);
     }
 
-    // Create and EAGERLY Connect client on init
-    async onModuleInit() {
-        const host = this.configService.get<string>('REDIS_HOST', 'localhost');
-        const port = this.configService.get<number>('REDIS_PORT', 6379);
-        const password: string | undefined =
-            this.configService.get<string>('REDIS_PASSWORD');
-
-        this.logger.log(`Initializing Redis connection to ${host}:${port}`);
-
-        this.redisClient = new IORedis({
-            host: host,
-            port: port,
-            password: password,
-            tls: {},
-            // lazyConnect: false is default, no need to set
-            connectionName: `myAppName-${process.pid}`, // Optional: Helps identify connections in Redis MONITOR
-            connectTimeout: 5000, // Example: 10 second timeout for connection attempt
-            maxRetriesPerRequest: 3, // Example: Don't retry commands indefinitely if connection drops
-            retryStrategy: (times) => {
-                // Example: Wait 50ms, 100ms, 200ms, ..., up to 2 seconds for reconnections
-                const delay = Math.min(times * 50, 1000);
-                this.logger.warn(
-                    `Redis connection retry attempt ${times}, retrying in ${delay}ms`,
-                );
-                return delay;
-            },
-        });
-
-        // Setup listeners before attempting connection explicitly
-        this.redisClient.on('error', (err) => {
-            // Log errors, especially useful for connection issues after initial connect
-            this.logger.error(`Redis client error: ${err.message}`);
-        });
-
-        this.redisClient.on('connect', () => {
-            this.logger.log('Redis client connected successfully.');
-        });
-
-        this.redisClient.on('reconnecting', () => {
-            this.logger.warn('Redis client attempting to reconnect...');
-        });
-
-        this.redisClient.on('close', () => {
-            // This might be logged during graceful shutdown too
-            this.logger.warn('Redis client connection closed.');
-        });
-
-        // --- Eager Connection Verification ---
-        try {
-            // IORedis connects automatically, but we can 'ping' to ensure it's truly ready.
-            // This will wait for the connection or throw if it fails within timeouts/retries.
-            await this.redisClient.ping();
-            this.logger.log(
-                'Redis initial connection verified (ping successful).',
-            );
-        } catch (error) {
-            if (error instanceof Error)
-                this.logger.error(
-                    `FATAL: Failed to establish initial Redis connection during startup - ${error.message}`,
-                );
-            // Attempt to clean up the client instance if partially created
-            await this.redisClient.quit().catch((error) => {
-                if (error instanceof Error)
-                    this.logger.error(
-                        `Error quitting Redis client after initial connection failure - ${error.message}`,
-                    );
-            });
-            throwLogged(new InternalServerErrorException());
-        }
-        // ------------------------------------
-    }
-
-    // Destroy client on shutdown
-    async onModuleDestroy() {
-        if (this.redisClient && this.redisClient.status !== 'end') {
-            this.logger.log(
-                'Disconnecting Redis client via onModuleDestroy...',
-            );
-            await this.redisClient.quit(); // Graceful disconnect
-            this.logger.log('Redis client disconnected.');
-        } else {
-            this.logger.log(
-                'Redis client already disconnected or was not initialized.',
-            );
-        }
+    private get redisClient() {
+        return this.redisClientService.getClient();
     }
 
     // --- Implementation of CacheProvider interface ---
