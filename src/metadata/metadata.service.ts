@@ -117,12 +117,12 @@ export class MetadataService implements OnModuleInit {
                 CACHE_TTL_ONE_MINUTE
             ) {
                 this.logger.debug(
-                    `Fresh cache hit for token metadata for wallet address ${walletAddress}.`,
+                    `Fresh cache hit for token metadata for wallet: ${walletAddress}.`,
                 );
                 return cachedWalletTokensWithMetadata.value;
             }
             this.logger.debug(
-                `Cache is old for token metadata for wallet address ${walletAddress}. Fetching fresh data.`,
+                `Stale cache hit for token metadata for wallet: ${walletAddress}. Fetching fresh data.`,
             );
         }
 
@@ -151,31 +151,28 @@ export class MetadataService implements OnModuleInit {
         const { rawTokenMetadataList, tokenIdentifierList } =
             this.splitToRawTokenMetadataOrIdentifiers(providedTokensMetadata);
 
-        const rawTokenMetadataOrTokenWithMetadataListPromises: Promise<
-            RawTokenMetadata | TokenWithMetadata
-        >[] = rawTokenMetadataList.map(async (item) => {
-            return (
-                (await this.getTokenWithMetadataFromLookupCache(
-                    item.chainName,
-                    item.address,
-                )) ?? item
+        const cachedTokensWithMetadata =
+            await this.getTokenWithMetadataListFromLookupCache(
+                rawTokenMetadataList, // Assuming rawTokenMetadataList matches the TokenIdentifier interface
             );
-        });
+
         const rawTokenMetadataOrTokenWithMetadataList: (
             | RawTokenMetadata
             | TokenWithMetadata
-        )[] = await Promise.all(
-            rawTokenMetadataOrTokenWithMetadataListPromises,
-        );
+        )[] = rawTokenMetadataList.map((originalItem, index) => {
+            // If the cached result exists at this index, use it. Otherwise, fallback to the original item.
+            return cachedTokensWithMetadata[index] ?? originalItem;
+        });
 
-        const tokenIdentifierListPromises = tokenIdentifierList.map((item) =>
-            this.getTokenWithMetadataFromLookupCache(
-                item.chainName,
-                item.address,
-            ),
-        );
+        // 1. Make a single cache call to fetch token metadata based on the identifiers.
+        const cachedTokenMetadataLookups =
+            await this.getTokenWithMetadataListFromLookupCache(
+                tokenIdentifierList,
+            );
+
+        // 2. Filter the lookup results to get only the items that were found (cache hits).
         const cachedTokenWithMetadataListFromTokenIdentifiers: TokenWithMetadata[] =
-            (await Promise.all(tokenIdentifierListPromises)).filter(
+            cachedTokenMetadataLookups.filter(
                 (item): item is TokenWithMetadata => item !== undefined,
             );
 
@@ -241,9 +238,6 @@ export class MetadataService implements OnModuleInit {
                 //|| !externalTokenMetadata.logoUrl // logoUrl is optional, so we don't check it
                 !externalTokenMetadata.decimals
             ) {
-                this.logger.debug(
-                    `Incomplete token metadata for address ${externalTokenMetadata.address} on chain ${externalTokenMetadata.chainName}. Return identifier.`,
-                );
                 tokenIdentifierList.push({
                     chainName: externalTokenMetadata.chainName,
                     address: externalTokenMetadata.address,
@@ -304,7 +298,7 @@ export class MetadataService implements OnModuleInit {
             this.databaseService.token.createMany({
                 data: tokensToCreate,
                 skipDuplicates: true,
-            })
+            }),
         ]);
 
         const filters = tokensToCreate.map((t) => ({
@@ -312,42 +306,40 @@ export class MetadataService implements OnModuleInit {
             address: t.address,
         }));
 
-        const newlyCreatedTokensWithDetails: TokenWithDetails[] = await this.databaseService.token.findMany({
-            where:   {
-                OR: filters
-            },
-            include: { chain: true, tokenMetadata: true },
-        });
+        const newlyCreatedTokensWithDetails: TokenWithDetails[] =
+            await this.databaseService.token.findMany({
+                where: {
+                    OR: filters,
+                },
+                include: { chain: true, tokenMetadata: true },
+            });
 
         this.logger.log(
             `Successfully saved ${newlyCreatedTokensWithDetails.length} new tokens with metadata to the database.`,
         );
 
-        await this.updateTokenWithMetadataLookupCache(newlyCreatedTokensWithDetails);
+        await this.updateTokenWithMetadataLookupCache(
+            newlyCreatedTokensWithDetails,
+        );
 
         return newlyCreatedTokensWithDetails.map((t) => toTokenWithMetadata(t));
     }
 
-    private async getTokenWithMetadataFromLookupCache(
-        chainName: string,
-        address: string,
-    ): Promise<TokenWithMetadata | undefined> {
-        const cacheKey = this.cacheService.getCacheKey(
-            'token-with-metadata-lookup',
-            {
-                chainName,
-                address,
-            },
-        );
-        const cachedTokenMetadata: TokenWithMetadata | undefined =
-            await this.cacheService.get(cacheKey);
-        if (cachedTokenMetadata) {
-            this.logger.debug(
-                `Token metadata for ${address} on ${chainName} fetched from cache.`,
-            );
-            return cachedTokenMetadata;
+    private async getTokenWithMetadataListFromLookupCache(
+        identifiers: TokenIdentifier[],
+    ): Promise<(TokenWithMetadata | undefined)[]> {
+        if (identifiers.length === 0) {
+            return [];
         }
-        return undefined;
+        // 1. Prepare all the cache keys in memory.
+        const cacheKeys = identifiers.map((ti) =>
+            this.cacheService.getCacheKey('token-with-metadata-lookup', {
+                chainName: ti.chainName,
+                address: ti.address,
+            }),
+        );
+
+        return await this.cacheService.mget<TokenWithMetadata>(cacheKeys);
     }
 
     private async updateTokenWithMetadataLookupCache(
@@ -357,22 +349,24 @@ export class MetadataService implements OnModuleInit {
             return;
         }
         this.logger.log(
-            `Updating Token Lookup Cache with ${tokensToCache.length} items...`,
+            `Updating Token Lookup Cache with ${tokensToCache.length} tokens with metadata...`,
         );
 
-        const cachePromises = tokensToCache.map((tokenWithDetails) => {
-            const key = this.cacheService.getCacheKey(
-                'token-with-metadata-lookup',
-                {
-                    chainName: tokenWithDetails.chain.name,
-                    address: tokenWithDetails.address,
-                },
-            );
-            return this.cacheService.set(
-                key,
-                toTokenWithMetadata(tokenWithDetails),
-            );
-        });
-        await Promise.all(cachePromises);
+        const itemsToCache: CacheMSetItem<TokenWithMetadata>[] =
+            tokensToCache.map((tokenWithDetails) => {
+                const key = this.cacheService.getCacheKey(
+                    'token-with-metadata-lookup',
+                    {
+                        chainName: tokenWithDetails.chain.name,
+                        address: tokenWithDetails.address,
+                    },
+                );
+                const value = toTokenWithMetadata(tokenWithDetails);
+
+                // Note: Add a TTL here if you want these keys to expire
+                return { key, value /*, ttlInSeconds: ... */ };
+            });
+
+        await this.cacheService.mset(itemsToCache);
     }
 }
