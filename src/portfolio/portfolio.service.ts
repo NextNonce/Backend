@@ -12,6 +12,7 @@ import { Portfolio, PortfolioAccess, Prisma } from '@prisma/client';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { PortfolioWalletService } from '@/portfolio-wallet/portfolio-wallet.service';
+import { CACHE_TTL_ONE_HOUR } from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class PortfolioService {
@@ -43,7 +44,7 @@ export class PortfolioService {
             'portfolio',
             portfolio.id,
         );
-        await this.cacheService.set(cacheKey, portfolio, 60 * 60);
+        await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_HOUR);
         const cacheKeyAll = this.cacheService.getCacheKey('portfolios', {
             userId,
         });
@@ -64,7 +65,11 @@ export class PortfolioService {
             await this.databaseService.portfolio.findMany({
                 where: { ownerId: userId },
             });
-        await this.cacheService.set(cacheKeyAll, portfolios, 60 * 60);
+        await this.cacheService.set(
+            cacheKeyAll,
+            portfolios,
+            CACHE_TTL_ONE_HOUR,
+        );
         return portfolios;
     }
 
@@ -118,7 +123,7 @@ export class PortfolioService {
             throwLogged(new NotFoundException(`Portfolio not found`));
         }
 
-        await this.cacheService.set(cacheKey, portfolio, 60 * 60);
+        await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_HOUR);
         return portfolio;
     }
 

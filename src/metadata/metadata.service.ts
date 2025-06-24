@@ -17,6 +17,12 @@ import {
 } from '@/token/types/token.types';
 import { toTokenWithMetadata } from '@/token/utils/token.utils';
 import { v4 as uuidv4 } from 'uuid';
+import {
+    CACHE_TTL_FOUR_WEEKS,
+    CACHE_TTL_ONE_DAY,
+    CACHE_TTL_ONE_MINUTE,
+} from '@/cache/constants/cache.constants';
+import { CacheMSetItem } from '@/cache/interfaces/cache-mset-item.interface';
 
 @Injectable()
 export class MetadataService implements OnModuleInit {
@@ -70,7 +76,7 @@ export class MetadataService implements OnModuleInit {
             await this.cacheService.set(
                 this.WARMED_FLAG_KEY,
                 true,
-                24 * 60 * 60,
+                CACHE_TTL_ONE_DAY,
             );
 
             this.logger.log(
@@ -106,7 +112,10 @@ export class MetadataService implements OnModuleInit {
             walletTokensWithMetadataCacheKey,
         ); // getWithMetadata returns an object with value and ageInSeconds, different from metadata of token
         if (cachedWalletTokensWithMetadata) {
-            if (cachedWalletTokensWithMetadata.ageInSeconds < 60) {
+            if (
+                cachedWalletTokensWithMetadata.ageInSeconds <
+                CACHE_TTL_ONE_MINUTE
+            ) {
                 this.logger.debug(
                     `Fresh cache hit for token metadata for wallet address ${walletAddress}.`,
                 );
@@ -189,6 +198,7 @@ export class MetadataService implements OnModuleInit {
         await this.cacheService.set(
             walletTokensWithMetadataCacheKey,
             tokenWithMetadataListToReturn,
+            CACHE_TTL_FOUR_WEEKS,
         );
 
         this.logger.log(

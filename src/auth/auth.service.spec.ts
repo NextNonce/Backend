@@ -5,6 +5,7 @@ import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 import { CacheService } from '@/cache/cache.service';
 import { NotFoundException } from '@nestjs/common';
 import { mockCacheService } from '../../test/helpers/cache.mock';
+import { CACHE_TTL_ONE_HOUR } from '@/cache/constants/cache.constants';
 
 const mockAuthProvider = {
     getAuthUserByJwt: jest.fn(),
@@ -69,12 +70,12 @@ describe('AuthService', () => {
             expect(mockCacheService.set).toHaveBeenCalledWith(
                 `mocked:auth-user:token:token`,
                 fetchedUser.id,
-                60 * 60,
+                CACHE_TTL_ONE_HOUR,
             );
             expect(mockCacheService.set).toHaveBeenCalledWith(
                 `mocked:auth-user:${fetchedUser.id}`,
                 fetchedUser,
-                60 * 60,
+                CACHE_TTL_ONE_HOUR,
             );
             expect(result).toEqual(fetchedUser);
         });

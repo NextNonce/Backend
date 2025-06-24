@@ -7,6 +7,7 @@ import { PortfolioWallet, Wallet } from '@prisma/client';
 import { PortfolioService } from '@/portfolio/portfolio.service';
 import { CreatePortfolioWalletDto } from '@/portfolio-wallet/dto/create-portfolio-wallet.dto';
 import { ConfigService } from '@nestjs/config';
+import { CACHE_TTL_ONE_HOUR } from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class PortfolioWalletService {
@@ -160,7 +161,7 @@ export class PortfolioWalletService {
         await this.cacheService.set(
             cacheKey,
             portfolioWalletRecord,
-            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_HOUR,
         );
     }
 
@@ -190,7 +191,7 @@ export class PortfolioWalletService {
         await this.cacheService.set(
             cacheKeyAll,
             PortfolioWalletRecords,
-            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_HOUR,
         );
     }
 

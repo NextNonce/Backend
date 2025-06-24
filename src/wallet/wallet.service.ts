@@ -132,7 +132,7 @@ export class WalletService {
         await this.cacheService.set(
             cacheKey,
             wallet,
-            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_HOUR,
         );
         return wallet;
     }
@@ -161,12 +161,12 @@ export class WalletService {
         await this.cacheService.set(
             pointerKey,
             wallet.id,
-            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_HOUR,
         );
         await this.cacheService.set(
             canonicalKey,
             wallet,
-            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_HOUR,
         );
     }
 
