@@ -14,6 +14,7 @@ import { BalanceModule } from './balance/balance.module';
 import { TokenModule } from './token/token.module';
 import { MetadataModule } from './metadata/metadata.module';
 import { ChainModule } from './chain/chain.module';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { RedisModule } from './common/redis/redis.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { RedisModule } from './common/redis/redis.module';
         TokenModule,
         MetadataModule,
         ChainModule,
+        RateLimitModule,
     ],
     controllers: [AppController],
     providers: [AppService],
