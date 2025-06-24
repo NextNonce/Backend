@@ -4,6 +4,7 @@ import {
     CACHE_PROVIDER,
     CacheProvider,
 } from '@/cache/interfaces/cache-provider.interface';
+import { CacheMSetItem } from '@/cache/interfaces/cache-mset-item.interface';
 
 @Injectable()
 export class CacheService {
@@ -34,6 +35,14 @@ export class CacheService {
         key: string,
     ): Promise<{ value: T; ageInSeconds: number } | undefined> {
         return await this.cacheProvider.getWithMetadata<T>(key);
+    }
+
+    async mget<T>(keys: string[]): Promise<(T | undefined)[]> {
+        return await this.cacheProvider.mget<T>(keys);
+    }
+
+    async mset<T>(items: CacheMSetItem<T>[]): Promise<void> {
+        await this.cacheProvider.mset<T>(items);
     }
 
     // Overload: for a single identifier
