@@ -3,9 +3,10 @@ import { isAddress, getAddress } from 'ethers';
 import { validateAndParseAddress, getChecksumAddress } from 'starknet';
 import { STARKNET_ADDRESS_LENGTH } from '@/wallet/constants/address.constants';
 import { throwLogged } from '@/common/helpers/error.helper';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 
+@Injectable()
 export class AddressUtils {
     private readonly logger: AppLoggerService;
 

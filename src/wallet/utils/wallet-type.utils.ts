@@ -2,12 +2,16 @@ import { ChainType, WalletType } from '@prisma/client';
 import { Alchemy, Network } from 'alchemy-sdk';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
-import { InternalServerErrorException } from '@nestjs/common';
+import {
+    Injectable,
+    InternalServerErrorException,
+    OnModuleInit,
+} from '@nestjs/common';
 import { LogExecutionTime } from '@/common/decorators/log-execution-time.decorator';
 import { RateLimiterStoreAbstract } from 'rate-limiter-flexible';
 import { RateLimiterService } from '@/rate-limit/rate-limiter.service';
 
-export class WalletTypeUtils {
+@Injectable()
 export class WalletTypeUtils implements OnModuleInit {
     private readonly logger: AppLoggerService;
     private readonly ALCHEMY_API_KEY: string;

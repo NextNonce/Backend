@@ -9,22 +9,21 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AddressUtils } from '@/wallet/utils/address.utils';
 import { WalletTypeUtils } from '@/wallet/utils/wallet-type.utils';
+import { CACHE_TTL_ONE_HOUR } from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class WalletService {
     private readonly logger: AppLoggerService;
-    private readonly addressUtils: AddressUtils;
-    private readonly walletTypeUtils: WalletTypeUtils;
     private readonly isTestingMode: boolean;
     private readonly testingCacheTTL: number;
     constructor(
         private readonly databaseService: DatabaseService,
         private readonly cacheService: CacheService,
         private readonly configService: ConfigService,
+        private readonly walletTypeUtils: WalletTypeUtils,
+        private readonly addressUtils: AddressUtils,
     ) {
         this.logger = new AppLoggerService(WalletService.name);
-        this.addressUtils = new AddressUtils();
-        this.walletTypeUtils = new WalletTypeUtils();
         this.isTestingMode = this.configService.get('MODE') === 'testing';
         this.testingCacheTTL = 5;
     }
