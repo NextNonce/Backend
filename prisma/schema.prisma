@@ -113,6 +113,7 @@ model Chain {
     id        String    @id @default(uuid())
     name      String    @unique
     chainType ChainType
+    logo      String
     tokens    Token[] // One-to-many relation to tokens
     createdAt DateTime  @default(now())
     updatedAt DateTime  @updatedAt
