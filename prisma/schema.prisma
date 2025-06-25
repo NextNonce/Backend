@@ -137,7 +137,7 @@ model Token {
     chainId         String
     chain           Chain         @relation(fields: [chainId], references: [id])
     address         String // "native" for native tokens
-    tokenMetadataId String        @unique
+    tokenMetadataId String
     tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
     unifiedTokenId  String?
     unifiedToken    UnifiedToken? @relation(fields: [unifiedTokenId], references: [id])
@@ -160,7 +160,7 @@ model TokenMetadata {
     description  String?
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @updatedAt
-    Token        Token?
+    tokens       Token[]
     UnifiedToken UnifiedToken?
 
     @@map("token_metadata")
