@@ -1,5 +1,4 @@
 import { Decimal } from '@prisma/client/runtime/library';
-import { TokenPrice } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class TokenPriceDto {

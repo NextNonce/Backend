@@ -1,6 +1,5 @@
 import { TokenMetadataDto } from '@/token/dto/token-metadata.dto';
 import { TokenPriceDto } from '@/token/dto/token-price.dto';
-import { Chain, Token } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class TokenDto {
