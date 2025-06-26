@@ -16,6 +16,7 @@ import { MetadataModule } from './metadata/metadata.module';
 import { ChainModule } from './chain/chain.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { RedisModule } from './common/redis/redis.module';
+import { PriceModule } from './price/price.module';
 
 @Module({
     imports: [
@@ -37,6 +38,7 @@ import { RedisModule } from './common/redis/redis.module';
         MetadataModule,
         ChainModule,
         RateLimitModule,
+        PriceModule,
     ],
     controllers: [AppController],
     providers: [AppService],
