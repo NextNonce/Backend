@@ -64,15 +64,14 @@ model User {
 }
 
 model Portfolio {
-    id              String             @id @default(uuid())
+    id              String            @id @default(uuid())
     name            String
     ownerId         String
-    owner           User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-    portfolioAccess PortfolioAccess    @default(PRIVATE)
-    createdAt       DateTime           @default(now())
-    updatedAt       DateTime           @updatedAt
+    owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    portfolioAccess PortfolioAccess   @default(PRIVATE)
+    createdAt       DateTime          @default(now())
+    updatedAt       DateTime          @updatedAt
     walletLinks     PortfolioWallet[]
-    balances        PortfolioBalance[]
 
     @@map("portfolios")
 }
@@ -102,8 +101,6 @@ model Wallet {
     derivationInfo Json? // for Bitcoin-like {"derivation": "single | hd", type: "legacy | segwit | nativeSegwit | taproot"}
     watchlists     Watchlist[] // many-to-many with Watchlists
     portfolioLinks PortfolioWallet[]
-    tokenLinks     WalletToken[]
-    balances       WalletBalance[]
 
     @@index([address])
     @@map("wallets")
@@ -142,7 +139,6 @@ model Token {
     unifiedTokenId  String?
     unifiedToken    UnifiedToken? @relation(fields: [unifiedTokenId], references: [id])
     prices          TokenPrice[]
-    walletLinks     WalletToken[]
     createdAt       DateTime      @default(now())
     updatedAt       DateTime      @updatedAt
 
@@ -176,42 +172,6 @@ model TokenPrice {
     @@unique([tokenId, timestamp])
     @@index([timestamp])
     @@map("token_prices")
-}
-
-model WalletBalance {
-    id         String   @id @default(uuid())
-    walletId   String
-    wallet     Wallet   @relation(fields: [walletId], references: [id])
-    balanceUsd Decimal  @db.Decimal(38, 18)
-    timestamp  DateTime @default(now())
-
-    @@unique([walletId, timestamp])
-    @@map("wallet_balances")
-}
-
-model PortfolioBalance {
-    id          String    @id @default(uuid())
-    portfolioId String
-    portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
-    balanceUsd  Decimal   @db.Decimal(38, 18)
-    timestamp   DateTime  @default(now())
-
-    @@unique([portfolioId, timestamp])
-    @@map("portfolio_balances")
-}
-
-model WalletToken {
-    id        String   @id @default(uuid())
-    walletId  String
-    wallet    Wallet   @relation(fields: [walletId], references: [id])
-    tokenId   String
-    token     Token    @relation(fields: [tokenId], references: [id])
-    balance   Decimal  @db.Decimal(38, 18)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@unique([walletId, tokenId])
-    @@map("wallets_tokens")
 }
 
 model Watchlist {
