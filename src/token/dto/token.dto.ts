@@ -12,15 +12,15 @@ export class TokenDto {
     type: 'single';
     @ApiProperty({
         type: 'string',
-        description: 'Unique identifier for the token on the chain',
-    })
-    address: string; // "native" for native tokens
-    @ApiProperty({
-        type: 'string',
         description:
             'The name of the blockchain network this token belongs to.',
     })
     chainName: string;
+    @ApiProperty({
+        type: 'string',
+        description: 'Unique identifier for the token on the chain',
+    })
+    address: string; // "native" for native tokens
     @ApiProperty({
         type: TokenMetadataDto,
         description:
@@ -34,13 +34,14 @@ export class TokenDto {
     tokenPrice: TokenPriceDto;
 
     constructor(
-        token: Token,
-        chain: Chain,
+        chainName: string,
+        tokenAddress: string,
         tokenMetadata: TokenMetadataDto,
         tokenPrice: TokenPriceDto,
     ) {
-        this.address = token.address;
-        this.chainName = chain.name;
+        this.type = 'single';
+        this.chainName = chainName;
+        this.address = tokenAddress;
         this.tokenMetadata = tokenMetadata;
         this.tokenPrice = tokenPrice;
     }

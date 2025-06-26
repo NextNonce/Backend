@@ -6,7 +6,7 @@ export class TokenMetadataDto {
     @ApiProperty({
         type: 'string',
         description: 'Symbol of the token, e.g., ETH, USDT',
-        example: 'ETH'
+        example: 'ETH',
     })
     symbol: string;
     @ApiProperty({

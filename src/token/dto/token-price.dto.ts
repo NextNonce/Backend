@@ -27,9 +27,13 @@ export class TokenPriceDto {
     })
     timestamp: Date;
 
-    constructor(tokenPrice: TokenPrice, change: Decimal | null = null) {
-        this.priceQuote = tokenPrice.priceUsd;
+    constructor(
+        priceQuote: Decimal,
+        timestamp: Date,
+        change: Decimal | null = null,
+    ) {
+        this.priceQuote = priceQuote;
         this.change = change;
-        this.timestamp = tokenPrice.timestamp;
+        this.timestamp = timestamp;
     }
 }
