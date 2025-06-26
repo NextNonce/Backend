@@ -24,4 +24,8 @@ export interface CacheProvider {
      * @param items An array of objects, each with a key, value, and optional TTL.
      */
     mset<T>(items: CacheMSetItem<T>[]): Promise<void>;
+
+    mgetWithMetadata<T>(
+        keys: string[],
+    ): Promise<({ value: T; ageInSeconds: number } | undefined)[]>;
 }
