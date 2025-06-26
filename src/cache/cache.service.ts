@@ -19,16 +19,20 @@ export class CacheService {
         this.version = this.configService.get<string>('CACHE_VERSION') || 'v1';
     }
 
-    async get<T>(key: string): Promise<T | undefined> {
-        return await this.cacheProvider.get<T>(key);
-    }
-
     async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
         await this.cacheProvider.set(key, value, ttlSeconds);
     }
 
-    async del(key: string): Promise<void> {
-        await this.cacheProvider.del(key);
+    async mset<T>(items: CacheMSetItem<T>[]): Promise<void> {
+        await this.cacheProvider.mset<T>(items);
+    }
+
+    async get<T>(key: string): Promise<T | undefined> {
+        return await this.cacheProvider.get<T>(key);
+    }
+
+    async mget<T>(keys: string[]): Promise<(T | undefined)[]> {
+        return await this.cacheProvider.mget<T>(keys);
     }
 
     async getWithMetadata<T>(
@@ -37,12 +41,14 @@ export class CacheService {
         return await this.cacheProvider.getWithMetadata<T>(key);
     }
 
-    async mget<T>(keys: string[]): Promise<(T | undefined)[]> {
-        return await this.cacheProvider.mget<T>(keys);
+    async mgetWithMetadata<T>(
+        keys: string[],
+    ): Promise<({ value: T; ageInSeconds: number } | undefined)[]> {
+        return await this.cacheProvider.mgetWithMetadata<T>(keys);
     }
 
-    async mset<T>(items: CacheMSetItem<T>[]): Promise<void> {
-        await this.cacheProvider.mset<T>(items);
+    async del(key: string): Promise<void> {
+        await this.cacheProvider.del(key);
     }
 
     // Overload: for a single identifier
