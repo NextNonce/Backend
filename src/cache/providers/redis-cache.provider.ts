@@ -157,7 +157,7 @@ export class RedisCacheProvider implements CacheProvider {
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
-                `Redis MGET transaction error: ${redisError.message}`,
+                `Redis MGET error in mget: ${redisError.message}`,
             );
             // On a total failure, return an array of undefined matching the input length.
             return new Array(keys.length).fill(undefined) as (T | undefined)[];
@@ -218,6 +218,60 @@ export class RedisCacheProvider implements CacheProvider {
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(`Redis MSET error: ${redisError.message}`);
+        }
+    }
+
+    async mgetWithMetadata<T>(
+        keys: string[],
+    ): Promise<({ value: T; ageInSeconds: number } | undefined)[]> {
+        if (keys.length === 0) {
+            return [];
+        }
+
+        try {
+            // Use Redis MGET to fetch all serialized data in one go
+            const serializedResults = await this.redisClient.mget(keys);
+            this.logger.debug(
+                `Cache MGET for ${keys.length} keys for metadata lookup.`,
+            );
+
+            // Map over the results to parse and add age metadata
+            return serializedResults.map((serializedData, index) => {
+                const key = keys[index]; // Get the original key for logging
+
+                if (serializedData === null) {
+                    return undefined;
+                }
+
+                try {
+                    const wrapper = JSON.parse(
+                        serializedData,
+                    ) as CacheWrapper<T>;
+                    const ageInSeconds = Math.round(
+                        (Date.now() - wrapper.timestamp) / 1000,
+                    );
+
+                    return { value: wrapper.value, ageInSeconds };
+                } catch (e) {
+                    const parseError = e as Error;
+                    this.logger.error(
+                        `Failed to parse JSON for key ${formatMessage(key)} in mgetWithMetadata`,
+                        parseError.message,
+                    );
+                    // Return undefined for individual parse failures
+                    return undefined;
+                }
+            });
+        } catch (error) {
+            const redisError = error as Error;
+            this.logger.error(
+                `Redis MGET error in mgetWithMetadata: ${redisError.message}`,
+            );
+            // On a total network/Redis error, return an array of undefined matching input length
+            return new Array(keys.length).fill(undefined) as (
+                | { value: T; ageInSeconds: number }
+                | undefined
+            )[];
         }
     }
 }
