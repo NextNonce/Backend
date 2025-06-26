@@ -12,8 +12,14 @@ import {
 import { TokenIdentifier, TokenWithMetadata } from '@/token/types/token.types';
 import { WalletBalancesDto } from '@/balance/dto/wallet-balances.dto';
 import { ExternalTokenBalanceDto } from '@/balance/dto/external-token-balance.dto';
-import { TokenWithMetadataAndExternalBalance } from '@/balance/types/balance.types';
-import { CACHE_TTL_ONE_MINUTE } from '@/cache/constants/cache.constants';
+import {
+    SingleTokenBalance,
+    TokenWithMetadataAndExternalBalance,
+} from '@/balance/types/balance.types';
+import {
+    CACHE_TTL_FOUR_WEEKS,
+    CACHE_TTL_ONE_MINUTE,
+} from '@/cache/constants/cache.constants';
 import { PriceService } from '@/price/price.service';
 import { PriceInfo } from '@/price/types/price.types';
 import { AssetBalanceDto } from '@/balance/dto/asset-balance.dto';
@@ -26,15 +32,8 @@ import { UnifiedTokenDto } from '@/token/dto/unified-token.dto';
 import { UnifiedTokenWithDetails } from '@/token/types/unified-token.types';
 import { calculateChangePercent } from '@/balance/utils/balance-change.utils';
 import { getKeyFromChainNameAndAddress } from '@/token/utils/token.utils';
-
-interface AggregationState {
-    // The running total with summed financial data. The `asset` property is a temporary placeholder.
-    aggregatedBalance: AssetBalanceDto;
-    // A list of the original asset DTOs that have been merged into this group.
-    sourceAssets: (TokenDto | UnifiedTokenDto)[];
-    // The canonical details for this group from the DB, if it's a unified group.
-    unifiedTokenDetails: UnifiedTokenWithDetails | undefined;
-}
+import { BalanceDto, TotalBalanceDto } from '@/balance/dto/balance.dto';
+import { AggregationState, SubTokenAggregation } from '@/balance/types/aggregation.types';
 
 @Injectable()
 export class BalanceService {
@@ -52,7 +51,7 @@ export class BalanceService {
         this.logger = new AppLoggerService(BalanceService.name);
     }
 
-    async getBalances(
+    async getWalletBalances(
         walletAddress: string,
         chainNames: string[] | undefined = undefined,
     ): Promise<WalletBalancesDto> {
@@ -90,7 +89,30 @@ export class BalanceService {
             );
         }
 
-        const walletTokensWithMetadata =
+        const freshWalletBalances = await this.fetchAndComputeWalletBalances(
+            walletAddress,
+            chainNames,
+            cachedWalletTokenBalances,
+        );
+
+        await this.cacheService.set(
+            walletTokenBalancesCacheKey,
+            freshWalletBalances,
+            CACHE_TTL_FOUR_WEEKS,
+        );
+
+        return freshWalletBalances;
+    }
+
+    private async fetchAndComputeWalletBalances(
+        walletAddress: string,
+        chainNames: string[],
+        staleCache:
+            | { value: WalletBalancesDto; ageInSeconds: number }
+            | undefined,
+    ): Promise<WalletBalancesDto> {
+        // Step 1: Fetch data from all external providers concurrently
+        const walletTokensWithMetadataPromise =
             this.metadataService.getTokensWithMetadataByWalletAddress(
                 walletAddress,
                 chainNames,
@@ -99,32 +121,42 @@ export class BalanceService {
         this.logger.log(
             `Calling balance provider for wallet: ${walletAddress} on chains: ${chainNames.slice(0, 4).join(', ')}...`,
         );
-        const providedTokenBalances =
-            await this.balanceProvider.getTokenBalances(
+        const providedTokenBalancesPromise =
+            this.balanceProvider.getTokenBalances(
                 walletAddress,
-                this.chainService.getAllChains().map((chain) => chain.name),
+                chainNames, // Use the scoped chainNames for the request
             );
 
+        const [walletTokensWithMetadata, providedTokenBalances] =
+            await Promise.all([
+                walletTokensWithMetadataPromise,
+                providedTokenBalancesPromise,
+            ]);
+
+        // Step 2: Handle provider failure
         if (!providedTokenBalances) {
             this.logger.warn(
                 `Balance provider failed to provide balances for wallet: ${walletAddress}`,
             );
-            if (cachedWalletTokenBalances) {
+            // If the provider fails, return the stale cache if we have it.
+            if (staleCache) {
                 this.logger.debug(
                     `Returning cached outdated token balances for wallet: ${walletAddress}`,
                 );
-                return cachedWalletTokenBalances.value;
+                return staleCache.value;
             }
-            return { balances: [] }; // No token balances provided and no cache available so return empty balances
+            // Otherwise, return an empty object.
+            return { assetBalances: [], totalBalance: null }; // No token balances provided and no cache available so return empty balances
         }
 
         this.logger.log(
             `Balance provider provided ${providedTokenBalances.length} token balances for wallet: ${walletAddress}`,
         );
 
+        // Step 3: Join, Transform, and Aggregate the data
         const tokenWithMetadataAndExternalBalanceList =
             this.joinByChainNameAndAddress(
-                await walletTokensWithMetadata,
+                walletTokensWithMetadata,
                 providedTokenBalances,
             );
 
@@ -132,48 +164,45 @@ export class BalanceService {
             tokenWithMetadataAndExternalBalanceList,
         );
 
-        const assetBalancesWithoutUnifiedToken = this.transformToAssetBalances(
+        const singleTokenBalances = this.transformToSingleTokenBalances(
             tokenWithMetadataAndExternalBalanceList,
             priceResults,
         );
 
-        const aggregatedAssetBalances = this.aggregateAssetBalances(assetBalancesWithoutUnifiedToken)
+        const aggregatedAssetBalances =
+            this.aggregateSingleTokenBalances(singleTokenBalances);
 
-        ///this.saveToFile(walletTokensWithMetadata, walletAddress, 'output_dune');
-        this.saveToFile(providedTokenBalances, walletAddress, 'output_okx');
-        this.saveToFile(
+        const totalBalance = this.calculateTotalBalance(
             aggregatedAssetBalances,
-            walletAddress,
-            'output_balance',
         );
-        this.saveToFile(priceResults, walletAddress, 'output_prices');
 
-        return {balances: assetBalancesWithoutUnifiedToken};
+        // Step 4: Return the final, computed DTO
+        return {
+            totalBalance: totalBalance,
+            assetBalances: aggregatedAssetBalances,
+        };
     }
-
 
     /**
      * Helper to find the unique identifier for an asset, which is the ID of its
      * unified token if it exists, or its own metadata ID if it's standalone.
      */
-    private getAssetGroupingInfo(asset: TokenDto | UnifiedTokenDto): { groupingKey: string, unifiedTokenDetails: UnifiedTokenWithDetails | undefined } {
+    private getAssetGroupingInfo(asset: TokenDto | UnifiedTokenDto): {
+        groupingKey: string;
+        unifiedTokenDetails: UnifiedTokenWithDetails | undefined;
+    } {
         let identifier: TokenIdentifier;
         if (asset.type === 'unified') {
-            identifier =  { chainName: asset.tokens[0].chainName, address: asset.tokens[0].address } as TokenIdentifier;
+            identifier = {
+                chainName: asset.tokens[0].chainName,
+                address: asset.tokens[0].address,
+            };
         } else {
-            identifier = { chainName: asset.chainName, address: asset.address } as TokenIdentifier;
+            identifier = { chainName: asset.chainName, address: asset.address };
         }
 
-        this.logger.debug(
-            `Determining grouping key for asset: ${asset.tokenMetadata.name} with identifier: ${JSON.stringify(identifier)}`,
-        )
-
-        const unifiedTokenDetails = this.tokenService.getUnifiedTokenByTokenIdentifier(identifier);
-
-        this.logger.debug(
-            `Found unified token details: ${unifiedTokenDetails ? unifiedTokenDetails.id : 'none'}`,
-        );
-
+        const unifiedTokenDetails =
+            this.tokenService.getUnifiedTokenByTokenIdentifier(identifier);
 
         let groupingKey: string;
         if (unifiedTokenDetails) {
@@ -181,134 +210,243 @@ export class BalanceService {
         } else {
             // If no unified token exists, it means this is a single token.
             const singleToken = asset as TokenDto;
-            groupingKey = getKeyFromChainNameAndAddress(singleToken.chainName, singleToken.address);
+            groupingKey = getKeyFromChainNameAndAddress(
+                singleToken.chainName,
+                singleToken.address,
+            );
         }
 
         return { groupingKey, unifiedTokenDetails };
     }
 
-    /**
-     * Helper to collect a unique list of TokenDto objects from a list of source assets.
-     */
-    private collectUniqueTokens(sourceAssets: (TokenDto | UnifiedTokenDto)[]): TokenDto[] {
-        const tokenMap = new Map<string, TokenDto>();
+    private sumIndividualBalances(balances: BalanceDto[]): BalanceDto {
+        let totalBalanceNative = new Decimal(0);
+        let totalBalanceQuote = new Decimal(0);
+        let totalBalanceQuoteChange = new Decimal(0);
 
-        for (const asset of sourceAssets) {
-            if (asset.type === 'single') {
-                tokenMap.set(getKeyFromChainNameAndAddress(asset.chainName, asset.address), asset);
-            } else { // 'unified'
-                asset.tokens.forEach(token => {
-                    tokenMap.set(getKeyFromChainNameAndAddress(token.chainName, token.address), token);
-                });
-            }
+        for (const balanceDto of balances) {
+            totalBalanceNative = totalBalanceNative.plus(
+                balanceDto.balanceNative,
+            );
+            totalBalanceQuote = totalBalanceQuote.plus(balanceDto.balanceQuote);
+            totalBalanceQuoteChange = totalBalanceQuoteChange.plus(
+                balanceDto.balanceQuoteChange ?? 0,
+            );
         }
-        return Array.from(tokenMap.values());
+
+        return new BalanceDto(
+            totalBalanceNative,
+            totalBalanceQuote,
+            totalBalanceQuoteChange,
+        );
     }
 
-    /**
-     * Aggregates a list of asset balances, grouping identical assets (e.g., USDC on Ethereum
-     * and USDC on Polygon) into a single entry with summed balances.
-     * @param assetBalances The raw list of asset balances to aggregate.
-     * @returns A new list of aggregated AssetBalanceDto objects.
-     */
-    private aggregateAssetBalances(
+    private calculateTotalBalance(
         assetBalances: AssetBalanceDto[],
-    ): AssetBalanceDto[] {
+    ): TotalBalanceDto | null {
+        if (assetBalances.length === 0) {
+            return null; // No balances to sum
+        }
+        const balances = assetBalances.map(
+            (assetBalance) => assetBalance.balance,
+        );
 
-        // The Map will store the aggregation state. The key is the grouping ID.
+        const total = this.sumIndividualBalances(balances);
+
+        return new TotalBalanceDto(
+            total.balanceQuote,
+            total.balanceQuoteChange,
+            total.balanceQuoteChangePercent,
+        );
+    }
+
+    aggregateSingleTokenBalances(
+        singleTokenBalances: SingleTokenBalance[],
+    ): AssetBalanceDto[] {
+        // Step 1: Group the list and aggregate the financial data for each unique token.
+        const aggregationMap = this.groupAndAggregate(singleTokenBalances);
+
+        // Step 2: Take the aggregated data and construct the final DTOs, applying the
+        // "minimum of two" rule to create UnifiedTokenDto where appropriate.
+
+        const assetBalances = this.finalizeConstruction(aggregationMap);
+
+        // Step 3: Sort the list of all assets by their balanceQuote in descending order.
+        assetBalances.sort((a: AssetBalanceDto, b: AssetBalanceDto) =>
+            b.balance.balanceQuote.comparedTo(a.balance.balanceQuote),
+        );
+
+        return assetBalances;
+    }
+
+    private groupAndAggregate(
+        singleTokenBalances: SingleTokenBalance[],
+    ): Map<string, AggregationState> {
         const aggregationMap = new Map<string, AggregationState>();
 
-        // --- PHASE 1: Group and Sum Financial Data ---
-        for (const currentBalance of assetBalances) {
-            const { groupingKey, unifiedTokenDetails } = this.getAssetGroupingInfo(currentBalance.asset);
-            const existingState = aggregationMap.get(groupingKey);
+        for (const currentBalance of singleTokenBalances) {
+            const asset = currentBalance.token;
 
-            if (!existingState) {
-                // First time seeing this asset group. Create a new state.
+            const { groupingKey, unifiedTokenDetails } =
+                this.getAssetGroupingInfo(asset);
+            const subTokenKey = getKeyFromChainNameAndAddress(
+                asset.chainName,
+                asset.address,
+            );
+
+            const existingGroupState = aggregationMap.get(groupingKey);
+
+            if (!existingGroupState) {
+                // First time seeing this group.
+                const newSubTokenAggregations = new Map<
+                    string,
+                    SubTokenAggregation
+                >();
+                newSubTokenAggregations.set(subTokenKey, {
+                    aggregatedBalance: currentBalance.balance,
+                    representativeAsset: asset,
+                });
                 aggregationMap.set(groupingKey, {
-                    aggregatedBalance: currentBalance, // Store the first DTO as the base
-                    sourceAssets: [currentBalance.asset],
+                    subTokenAggregations: newSubTokenAggregations,
                     unifiedTokenDetails: unifiedTokenDetails,
                 });
             } else {
-                // Merge the current balance into the existing state.
-                const { aggregatedBalance, sourceAssets } = existingState;
-
-                // Sum up the financial values.
-                aggregatedBalance.balance = aggregatedBalance.balance.plus(currentBalance.balance);
-                aggregatedBalance.balanceQuote = aggregatedBalance.balanceQuote.plus(currentBalance.balanceQuote);
-
-                const existingChange = aggregatedBalance.balanceQuoteChange ?? new Decimal(0);
-                const currentChange = currentBalance.balanceQuoteChange ?? new Decimal(0);
-                aggregatedBalance.balanceQuoteChange = existingChange.plus(currentChange);
-
-                // Add the original asset to our list for later processing.
-                sourceAssets.push(currentBalance.asset); // not sure if it updates the original AggregationState
+                // Group exists, check for the sub-token.
+                const existingSubToken =
+                    existingGroupState.subTokenAggregations.get(subTokenKey);
+                if (!existingSubToken) {
+                    // First time seeing this sub-token within this group.
+                    existingGroupState.subTokenAggregations.set(subTokenKey, {
+                        aggregatedBalance: currentBalance.balance,
+                        representativeAsset: asset,
+                    });
+                } else {
+                    // We have multiple balances for the exact same token. Sum them.
+                    const accumulatedBalance =
+                        existingSubToken.aggregatedBalance;
+                    accumulatedBalance.balanceNative =
+                        accumulatedBalance.balanceNative.plus(
+                            currentBalance.balance.balanceNative,
+                        );
+                    accumulatedBalance.balanceQuote =
+                        accumulatedBalance.balanceQuote.plus(
+                            currentBalance.balance.balanceQuote,
+                        );
+                    const existingChange =
+                        accumulatedBalance.balanceQuoteChange ?? new Decimal(0);
+                    const currentChange =
+                        currentBalance.balance.balanceQuoteChange ??
+                        new Decimal(0);
+                    accumulatedBalance.balanceQuoteChange =
+                        existingChange.plus(currentChange);
+                }
             }
         }
+        return aggregationMap;
+    }
 
-        // --- PHASE 2: Finalize DTOs based on the "minimum of two" rule ---
-        const finalBalances: AssetBalanceDto[] = [];
+    /**
+     * Transforms the final aggregation map into a list of AssetBalanceDto objects,
+     * applying the "minimum of two" rule for creating UnifiedTokenDto.
+     * @param aggregationMap The map containing the fully aggregated state.
+     * @returns List of asset balances.
+     */
+    private finalizeConstruction(
+        aggregationMap: Map<string, AggregationState>,
+    ): AssetBalanceDto[] {
+        const assetBalances: AssetBalanceDto[] = [];
         for (const state of aggregationMap.values()) {
-            const { aggregatedBalance, sourceAssets, unifiedTokenDetails } = state;
+            const { subTokenAggregations, unifiedTokenDetails } = state;
+            const uniqueSubTokens = Array.from(subTokenAggregations.values());
 
-            // Check if we have enough assets to justify creating a UnifiedTokenDto.
-            if (sourceAssets.length >= 2) {
-                this.logger.debug(
-                    `Found ${sourceAssets.length} assets for grouping key: ${aggregatedBalance.asset.tokenMetadata.name})`,
+            if (uniqueSubTokens.length >= 2) {
+                // CASE A: Create a UnifiedTokenDto
+                if (!unifiedTokenDetails) {
+                    this.logger.warn(
+                        `Expected unified token details for grouping key, but found none.`,
+                    );
+                    continue; // Skip this group if no unified token details are found
+                }
+                // Sort the underlying tokens by their balanceQuote in descending order
+                uniqueSubTokens.sort((a, b) =>
+                    b.aggregatedBalance.balanceQuote.comparedTo(
+                        a.aggregatedBalance.balanceQuote,
+                    ),
                 );
-            }
-            if (sourceAssets.length >= 2 && unifiedTokenDetails) {
-                // We have 2 or more assets from the same group, create a unified view.
 
-                this.logger.debug(
-                    `Aggregating ${sourceAssets.length} assets into a unified token group: ${unifiedTokenDetails.tokenMetadata.name} (${unifiedTokenDetails.id})`,
-                )
+                const finalTokens = uniqueSubTokens.map(
+                    (sub) => sub.representativeAsset,
+                );
+                const finalIndividualBalances = uniqueSubTokens.map(
+                    (sub) => sub.aggregatedBalance,
+                );
+                const totalAggregatedBalance = this.sumIndividualBalances(
+                    finalIndividualBalances,
+                );
+                const unifiedMetadataDto = TokenMetadataDto.fromModel(
+                    unifiedTokenDetails.tokenMetadata,
+                );
+                const representativePriceDto = finalTokens[0].tokenPrice;
 
-                // Collect all the unique TokenDtos from the source assets.
-                const allTokensInGroup = this.collectUniqueTokens(sourceAssets);
-
-                const unifiedMetadataDto = TokenMetadataDto.fromModel(unifiedTokenDetails.tokenMetadata);
-
-                // The price of the unified token is the aggregated quote divided by aggregated balance.
-                // We'll take the price from the first token as a representative price.
-                const representativePriceDto = allTokensInGroup[0].tokenPrice;
-
-                // Update the asset property of our aggregated balance.
-                aggregatedBalance.asset = new UnifiedTokenDto(
-                    allTokensInGroup,
+                const unifiedAsset = new UnifiedTokenDto(
+                    finalTokens,
+                    finalIndividualBalances,
                     unifiedMetadataDto,
                     representativePriceDto,
                 );
-
-                // Recalculate percentage change for the final aggregated DTO
-                aggregatedBalance.balanceQuoteChangePercent =
-                    aggregatedBalance.balanceQuoteChange
-                        ? calculateChangePercent(aggregatedBalance.balanceQuote, aggregatedBalance.balanceQuoteChange)
-                        : null;
-
-                finalBalances.push(aggregatedBalance);
-
-            } else {
-                this.logger.debug(
-                    `Keeping single asset balance without unification: ${aggregatedBalance.asset.tokenMetadata.name})`,
+                assetBalances.push(
+                    new AssetBalanceDto(unifiedAsset, totalAggregatedBalance),
                 );
-                // Only one asset from this group was found. We do NOT unify it.
-                // We simply return the original, unmodified AssetBalanceDto.
-                finalBalances.push(aggregatedBalance);
+            } else {
+                // CASE B: Do NOT unify.The group has only one unique token. Operate on the first (and only) element.
+                const subToken = uniqueSubTokens[0];
+                subToken.aggregatedBalance.balanceQuoteChangePercent = subToken
+                    .aggregatedBalance.balanceQuoteChange
+                    ? calculateChangePercent(
+                          subToken.aggregatedBalance.balanceQuote,
+                          subToken.aggregatedBalance.balanceQuoteChange,
+                      )
+                    : null;
+                assetBalances.push(
+                    new AssetBalanceDto(
+                        subToken.representativeAsset,
+                        subToken.aggregatedBalance,
+                    ),
+                );
             }
         }
-
-        return finalBalances;
+        return assetBalances;
     }
 
+    private flattenAssetBalances(
+        assetBalances: AssetBalanceDto[],
+    ): AssetBalanceDto[] {
+        const flattenedList: AssetBalanceDto[] = [];
 
-    private transformToAssetBalances(
+        for (const balance of assetBalances) {
+            if (balance.asset.type === 'single') {
+                // This is already a simple TokenDto balance, pass it through.
+                flattenedList.push(balance);
+            } else {
+                // This is a UnifiedTokenDto. Unroll it into its constituent parts.
+                // For each underlying token, create a new AssetBalanceDto.
+                for (let i = 0; i < balance.asset.tokens.length; i++) {
+                    const tokenDto = balance.asset.tokens[i];
+                    const balanceDto = balance.asset.balances[i]; // The corresponding balance
+                    flattenedList.push(
+                        new AssetBalanceDto(tokenDto, balanceDto),
+                    );
+                }
+            }
+        }
+        return flattenedList;
+    }
+
+    private transformToSingleTokenBalances(
         tokenWithMetadataAndExternalBalanceList: TokenWithMetadataAndExternalBalance[],
         priceResults: PriceInfo[],
-    ): AssetBalanceDto[]  {
+    ): SingleTokenBalance[] {
         return tokenWithMetadataAndExternalBalanceList.map((item, index) => {
-
             // --- Step 1: Get Corresponding Data ---
             // Get the price data for this token using the index.
             const priceInfo = priceResults[index];
@@ -326,22 +464,23 @@ export class BalanceService {
             // The absolute change in the USD value of the balance.
             // This is calculated as: (user's token balance) * (the token's price change).
             // If there's no price change data, this will be null.
-            const balanceQuoteChange: Decimal | null =
-                priceInfo.priceUsdChange
-                    ? balance.times(priceInfo.priceUsdChange)
-                    : null;
+            const balanceQuoteChange: Decimal | null = priceInfo.priceUsdChange
+                ? balance.times(priceInfo.priceUsdChange)
+                : null;
 
             // --- Step 3: Construct All DTOs ---
 
             // Create TokenMetadataDto using the provided static factory method.
-            const tokenMetadataDto = TokenMetadataDto.fromModel(tokenWithMetadata.tokenMetadata);
+            const tokenMetadataDto = TokenMetadataDto.fromModel(
+                tokenWithMetadata.tokenMetadata,
+            );
 
             // Create TokenPriceDto. We instantiate it directly since the constructor
             // in your example requires a different input type.
             const tokenPriceDto = new TokenPriceDto(
-                priceInfo.currentPriceUsd,        // priceQuote
-                priceInfo.timestamp,              // timestamp
-                priceInfo.priceUsdChange ?? null, // change, handle undefined case
+                priceInfo.currentPriceUsd, // priceQuote
+                priceInfo.timestamp, // timestamp
+                priceInfo.priceUsdChange ?? null, // change, handle an undefined case
             );
 
             // Create the main asset DTO. We also instantiate this directly because
@@ -353,14 +492,18 @@ export class BalanceService {
                 tokenPriceDto,
             );
 
+            const balanceDto = new BalanceDto(
+                balance, // balanceNative
+                balanceQuote, // balanceQuote
+                balanceQuoteChange, // balanceQuoteChange
+            );
+
             // --- Step 4: Construct and Return Final DTO ---
             // The AssetBalanceDto constructor will automatically calculate the percentage change.
-            return new AssetBalanceDto(
-                tokenDto,
-                balance,
-                balanceQuote,
-                balanceQuoteChange,
-            );
+            return {
+                token: tokenDto,
+                balance: balanceDto,
+            };
         });
     }
 
@@ -373,12 +516,20 @@ export class BalanceService {
         const walletTokensWithMetadataMap: Record<string, TokenWithMetadata> =
             {};
         walletTokensWithMetadata.forEach((token) => {
-            const key = getKeyFromChainNameAndAddress(token.chainName, token.address);
+            const key = getKeyFromChainNameAndAddress(
+                token.chainName,
+                token.address,
+            );
             walletTokensWithMetadataMap[key] = token;
         });
 
+        let missingTokensCount = 0;
+
         providedTokenBalances.forEach((balance) => {
-            const key = getKeyFromChainNameAndAddress(balance.chainName, balance.address);
+            const key = getKeyFromChainNameAndAddress(
+                balance.chainName,
+                balance.address,
+            );
             const tokenWithMetadata = walletTokensWithMetadataMap[key];
             if (tokenWithMetadata) {
                 tokenWithMetadataAndExternalBalanceList.push({
@@ -386,11 +537,15 @@ export class BalanceService {
                     externalBalance: balance,
                 });
             } else {
-                this.logger.warn(
-                    `No metadata found for token: ${key}`,
-                );
+                missingTokensCount++;
             }
         });
+
+        if (missingTokensCount > 0) {
+            this.logger.warn(
+                `Found ${missingTokensCount} provided token balances without matching metadata.`,
+            );
+        }
 
         return tokenWithMetadataAndExternalBalanceList;
     }
@@ -416,6 +571,7 @@ export class BalanceService {
         walletTokensWithMetadata: any[],
         walletAddress: string,
         fileName: string,
+        content: string | undefined = undefined,
     ): void {
         const timestamp = new Date()
             .toISOString()
@@ -427,7 +583,8 @@ export class BalanceService {
         console.log(`\nSaving filtered data to: ${outputFile}`);
         mkdirSync(outputDir, { recursive: true });
 
-        const fileContent = JSON.stringify(walletTokensWithMetadata, null, 2);
+        const fileContent =
+            content ?? JSON.stringify(walletTokensWithMetadata, null, 2);
         writeFileSync(outputFile, fileContent, 'utf-8');
 
         console.log('\n✅ Success! Data saved.');
