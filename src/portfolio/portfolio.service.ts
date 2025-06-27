@@ -8,11 +8,13 @@ import {
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
-import { Portfolio, PortfolioAccess, Prisma } from '@prisma/client';
+import { Portfolio, PortfolioAccess, PortfolioWallet, Prisma, Wallet } from '@prisma/client';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { PortfolioWalletService } from '@/portfolio-wallet/portfolio-wallet.service';
 import { CACHE_TTL_ONE_HOUR } from '@/cache/constants/cache.constants';
+import { PortfolioBalancesDto } from '@/balance/dto/portfolio-balances.dto';
+import { BalanceService } from '@/balance/balance.service';
 
 @Injectable()
 export class PortfolioService {
@@ -20,6 +22,7 @@ export class PortfolioService {
     constructor(
         private readonly databaseService: DatabaseService,
         private readonly cacheService: CacheService,
+        private readonly balanceService: BalanceService,
         @Inject(forwardRef(() => PortfolioWalletService))
         private readonly portfolioWalletService: PortfolioWalletService,
     ) {
@@ -125,6 +128,20 @@ export class PortfolioService {
 
         await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_HOUR);
         return portfolio;
+    }
+
+    async getCachedPortfolioBalances(
+        portfolioId: string,
+        userId: string,
+    ): Promise<PortfolioBalancesDto> {
+        const wallets: { portfolioWallet: PortfolioWallet; wallet: Wallet }[] = await this.portfolioWalletService.findAll(
+            portfolioId,
+            userId,
+        );
+
+        return await this.balanceService.getPortfolioBalancesFromCache(
+            wallets.map((wallet) => wallet.wallet.address),
+        );
     }
 
     /*async update(id: number, updatePortfolioDto: UpdatePortfolioDto) {
