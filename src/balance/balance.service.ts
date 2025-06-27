@@ -33,7 +33,12 @@ import { UnifiedTokenWithDetails } from '@/token/types/unified-token.types';
 import { calculateChangePercent } from '@/balance/utils/balance-change.utils';
 import { getKeyFromChainNameAndAddress } from '@/token/utils/token.utils';
 import { BalanceDto, TotalBalanceDto } from '@/balance/dto/balance.dto';
-import { AggregationState, SubTokenAggregation } from '@/balance/types/aggregation.types';
+import {
+    AggregationState,
+    SubTokenAggregation,
+} from '@/balance/types/aggregation.types';
+import { PortfolioBalancesDto } from '@/balance/dto/portfolio-balances.dto';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class BalanceService {
@@ -67,16 +72,17 @@ export class BalanceService {
         const walletTokenBalancesCacheKey = this.cacheService.getCacheKey(
             'wallet-token-balances',
             {
-                walletAddress,
+                walletAddress: walletAddress,
                 chainNames: chainNames.sort().join(','),
             },
         );
 
         const cachedWalletTokenBalances:
             | { value: WalletBalancesDto; ageInSeconds: number }
-            | undefined = await this.cacheService.getWithMetadata(
-            walletTokenBalancesCacheKey,
-        );
+            | undefined =
+            await this.cacheService.getWithMetadata<WalletBalancesDto>(
+                walletTokenBalancesCacheKey,
+            );
         if (cachedWalletTokenBalances) {
             if (cachedWalletTokenBalances.ageInSeconds < CACHE_TTL_ONE_MINUTE) {
                 this.logger.debug(
@@ -183,6 +189,158 @@ export class BalanceService {
         };
     }
 
+    async getPortfolioBalancesFromCache(
+        walletAddresses: string[],
+        chainNames: string[] | undefined = undefined,
+    ): Promise<PortfolioBalancesDto> {
+        if (!chainNames) {
+            chainNames = this.chainService
+                .getAllChains()
+                .map((chain) => chain.name);
+        }
+        this.logger.debug(
+            `Fetching token balances for wallets: ${walletAddresses.join(
+                ', ',
+            )} on chains: ${chainNames.join(', ')}`,
+        );
+
+        const portfolioBalancesCacheKey = this.cacheService.getCacheKey(
+            'portfolio-token-balances',
+            {
+                walletAddresses: walletAddresses.sort().join(','),
+                chainNames: chainNames.sort().join(','),
+            },
+        );
+
+        const cachedPortfolioBalances:
+            | { value: PortfolioBalancesDto; ageInSeconds: number }
+            | undefined =
+            await this.cacheService.getWithMetadata<PortfolioBalancesDto>(
+                portfolioBalancesCacheKey,
+            );
+
+        if (cachedPortfolioBalances) {
+            if (
+                cachedPortfolioBalances.ageInSeconds < CACHE_TTL_ONE_MINUTE &&
+                cachedPortfolioBalances.value.actual
+            ) {
+                this.logger.debug(
+                    `Fresh cache hit for token balances for wallets: ${walletAddresses.join(', ')}`,
+                );
+                return cachedPortfolioBalances.value;
+            }
+            this.logger.debug(`Stale cache hit for portfolio token balances.`);
+        }
+
+        this.logger.debug(
+            `Proceeding to aggregate PortfolioBalancesDto from wallet caches.`,
+        );
+
+        const portfolioBalancesDto =
+            await this.aggregateBalancesFromCachedWallets(
+                walletAddresses,
+                chainNames,
+                cachedPortfolioBalances?.value,
+            );
+
+        await this.cacheService.set(
+            portfolioBalancesCacheKey,
+            portfolioBalancesDto,
+            CACHE_TTL_FOUR_WEEKS,
+        );
+
+        return portfolioBalancesDto;
+    }
+
+    private async aggregateBalancesFromCachedWallets(
+        walletAddresses: string[],
+        chainNames: string[],
+        staleCache?: PortfolioBalancesDto,
+    ): Promise<PortfolioBalancesDto> {
+        let isActual = true; // Assume true until a stale or missing wallet is found
+
+        const walletTokenBalancesCacheKeys = walletAddresses.map((address) =>
+            this.cacheService.getCacheKey('wallet-token-balances', {
+                walletAddress: address,
+                chainNames: chainNames.sort().join(','),
+            }),
+        );
+
+        const cachedWalletTokenBalancesList =
+            await this.cacheService.mgetWithMetadata<WalletBalancesDto>(
+                walletTokenBalancesCacheKeys,
+            );
+
+        const walletBalances: WalletBalancesDto[] =
+            cachedWalletTokenBalancesList
+                .map((cachedWalletTokenBalances, index) => {
+                    const address = walletAddresses[index]; // Get original wallet address for logging
+                    if (cachedWalletTokenBalances) {
+                        let cacheState = 'Stale'; // Default to stale if no specific freshness check here
+                        if (
+                            cachedWalletTokenBalances.ageInSeconds <
+                            CACHE_TTL_ONE_MINUTE
+                        ) {
+                            cacheState = 'Fresh';
+                        } else {
+                            isActual = false; // If any wallet is stale, the whole portfolio is stale
+                        }
+                        this.logger.debug(
+                            `${cacheState} cache hit for token balances for wallet: ${address}.`,
+                        );
+                        // Use plainToInstance to ensure Decimal objects are re-hydrated
+                        return plainToInstance(
+                            WalletBalancesDto,
+                            cachedWalletTokenBalances.value,
+                            { enableImplicitConversion: true },
+                        );
+                    } else {
+                        this.logger.debug(
+                            `No cached token balances found for wallet: ${address}`,
+                        );
+                        isActual = false; // If any wallet is not cached, the whole portfolio is stale
+                        return undefined; // Filtered out later
+                    }
+                })
+                .filter(
+                    (balance): balance is WalletBalancesDto =>
+                        balance !== undefined,
+                ); // Type guard for filter
+
+        if (walletBalances.length === 0) {
+            if (staleCache) return staleCache; // Return cached value if no wallet balances are found
+            this.logger.debug(
+                `No wallet balances found for portfolio. Returning empty portfolio balances.`,
+            );
+            return {
+                actual: false,
+                totalBalance: null,
+                assetBalances: [],
+            };
+        }
+
+        const portfolioAssetBalances = walletBalances.flatMap(
+            (walletBalance) => walletBalance.assetBalances,
+        );
+
+        const portfolioSingleTokenBalances = this.flattenToSingleTokenBalances(
+            portfolioAssetBalances,
+        );
+
+        const aggregatedPortfolioAssetBalances =
+            this.aggregateSingleTokenBalances(portfolioSingleTokenBalances);
+
+        const portfolioTotalBalance = this.calculateTotalBalance(
+            aggregatedPortfolioAssetBalances,
+        );
+
+        return {
+            actual: isActual,
+            totalBalance: portfolioTotalBalance,
+            assetBalances: aggregatedPortfolioAssetBalances,
+        };
+    }
+
     /**
      * Helper to find the unique identifier for an asset, which is the ID of its
      * unified token if it exists, or its own metadata ID if it's standalone.
@@ -260,9 +418,11 @@ export class BalanceService {
         );
     }
 
-    aggregateSingleTokenBalances(
+    private aggregateSingleTokenBalances(
         singleTokenBalances: SingleTokenBalance[],
     ): AssetBalanceDto[] {
+        if (singleTokenBalances.length === 0) return []; // No balances to aggregate
+
         // Step 1: Group the list and aggregate the financial data for each unique token.
         const aggregationMap = this.groupAndAggregate(singleTokenBalances);
 
@@ -418,24 +578,26 @@ export class BalanceService {
         return assetBalances;
     }
 
-    private flattenAssetBalances(
+    private flattenToSingleTokenBalances(
         assetBalances: AssetBalanceDto[],
-    ): AssetBalanceDto[] {
-        const flattenedList: AssetBalanceDto[] = [];
+    ): SingleTokenBalance[] {
+        const flattenedList: SingleTokenBalance[] = [];
 
-        for (const balance of assetBalances) {
-            if (balance.asset.type === 'single') {
+        for (const assetBalance of assetBalances) {
+            if (assetBalance.asset.type === 'single') {
                 // This is already a simple TokenDto balance, pass it through.
-                flattenedList.push(balance);
+                flattenedList.push({
+                    token: assetBalance.asset,
+                    balance: assetBalance.balance,
+                });
             } else {
                 // This is a UnifiedTokenDto. Unroll it into its constituent parts.
                 // For each underlying token, create a new AssetBalanceDto.
-                for (let i = 0; i < balance.asset.tokens.length; i++) {
-                    const tokenDto = balance.asset.tokens[i];
-                    const balanceDto = balance.asset.balances[i]; // The corresponding balance
-                    flattenedList.push(
-                        new AssetBalanceDto(tokenDto, balanceDto),
-                    );
+                for (let i = 0; i < assetBalance.asset.tokens.length; i++) {
+                    flattenedList.push({
+                        token: assetBalance.asset.tokens[i],
+                        balance: assetBalance.asset.balances[i],
+                    });
                 }
             }
         }
