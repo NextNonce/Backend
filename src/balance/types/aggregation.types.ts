@@ -2,7 +2,6 @@ import { BalanceDto } from '@/balance/dto/balance.dto';
 import { TokenDto } from '@/token/dto/token.dto';
 import { UnifiedTokenWithDetails } from '@/token/types/unified-token.types';
 
-
 export type SubTokenAggregation = {
     // The summed-up balance for this specific token.
     aggregatedBalance: BalanceDto;
