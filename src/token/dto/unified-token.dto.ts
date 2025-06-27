@@ -3,6 +3,7 @@ import { TokenDto } from '@/token/dto/token.dto';
 import { TokenPriceDto } from '@/token/dto/token-price.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { BalanceDto } from '@/balance/dto/balance.dto';
+import { Type } from 'class-transformer';
 
 export class UnifiedTokenDto {
     @ApiProperty({
@@ -16,12 +17,14 @@ export class UnifiedTokenDto {
         description: 'List of tokens that are unified.',
         isArray: true,
     })
+    @Type(() => TokenDto)
     tokens: TokenDto[];
     @ApiProperty({
         type: [BalanceDto],
         description: 'Balances of individual tokens across different chains.',
         isArray: true,
     })
+    @Type(() => BalanceDto)
     balances: BalanceDto[];
     @ApiProperty({
         type: TokenMetadataDto,
