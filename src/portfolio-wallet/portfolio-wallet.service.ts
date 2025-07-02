@@ -195,6 +195,20 @@ export class PortfolioWalletService {
         );
     }
 
+    private async patchCachedAll(
+        portfolioId: string,
+        newEntry: { portfolioWallet: PortfolioWallet; wallet: Wallet },
+    ) {
+        // 1) Try to read the existing cached list
+        const existing = await this.getCachedAll(portfolioId);
+
+        // 2) If it exists, append; otherwise start a new array
+        const updated = existing ? [...existing, newEntry] : [newEntry];
+
+        // 3) Write it back with the same TTL as cacheAll
+        await this.cacheAll(portfolioId, updated);
+    }
+
     private async getCachedAll(
         portfolioId: string,
     ): Promise<
