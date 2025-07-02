@@ -10,6 +10,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { CacheMSetItem } from '@/cache/interfaces/cache-mset-item.interface';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
 
 // Helper to get a consistent date string (important to avoid timezone issues)
 const getUTCDateString = (date: Date): string => {
@@ -84,6 +85,7 @@ export class PriceService {
 
         // Step 5: Update the cache IN BULK for ALL tokens.
         const cacheItemsToSet: CacheMSetItem<CachedPriceData>[] = [];
+        const cacheItemsToSetWithTTL: CacheMSetItem<CachedPriceData>[] = [];
 
         // Add the "latest" price for every token in the batch
         priceUpdates.forEach((p) => {
@@ -99,7 +101,7 @@ export class PriceService {
 
         // Add the "daily" snapshot for the tokens we just wrote to the DB
         tokenPricesToCreateInDb.forEach((p) => {
-            cacheItemsToSet.push({
+            cacheItemsToSetWithTTL.push({
                 key: this.cacheService.getCacheKey('prices-daily', {
                     tokenId: p.tokenId,
                     date: todayDateString,
@@ -107,12 +109,20 @@ export class PriceService {
                 value: {
                     price: p.priceUsd.toString(),
                 },
+                ttlInSeconds: CACHE_TTL_ONE_WEEK
             });
         });
 
         if (cacheItemsToSet.length > 0) {
             await this.cacheService.mset(cacheItemsToSet);
-            this.logger.debug(`Set ${cacheItemsToSet.length} items in cache.`);
+            this.logger.debug(`Set ${cacheItemsToSet.length} prices-latest in cache without TTL.`);
+        }
+
+        if (cacheItemsToSetWithTTL.length > 0) {
+            await this.cacheService.mset(cacheItemsToSetWithTTL);
+            this.logger.debug(
+                `Set ${cacheItemsToSetWithTTL.length} prices-daily in cache with TTL CACHE_TTL_ONE_WEEK.`,
+            );
         }
     }
 
