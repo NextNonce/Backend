@@ -68,12 +68,15 @@ export class PortfolioService {
             await this.databaseService.portfolio.findMany({
                 where: { ownerId: userId },
             });
+        const sortedPortfolios =
+            portfolios.sort((a: Portfolio, b: Portfolio) => a.createdAt.getTime() - b.createdAt.getTime()
+        );
         await this.cacheService.set(
             cacheKeyAll,
-            portfolios,
+            sortedPortfolios,
             CACHE_TTL_ONE_HOUR,
         );
-        return portfolios;
+        return sortedPortfolios;
     }
 
     async findOneAndVerifyAccess({
@@ -130,7 +133,7 @@ export class PortfolioService {
         return portfolio;
     }
 
-    async getCachedPortfolioBalances(
+    async getCachedBalances(
         portfolioId: string,
         userId: string,
     ): Promise<PortfolioBalancesDto> {
