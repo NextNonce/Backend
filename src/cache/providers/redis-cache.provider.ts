@@ -31,24 +31,24 @@ export class RedisCacheProvider implements CacheProvider {
         try {
             const serializedData = await this.redisClient.get(key);
             if (serializedData === null) {
-                this.logger.debug(`Cache MISS for key: ${formatMessage(key)}`);
+                this.logger.debug(`GET: Cache MISS for key: ${formatMessage(key)}`);
                 return undefined;
             }
-            this.logger.debug(`Cache HIT for key: ${formatMessage(key)}`);
+            this.logger.debug(`GET: Cache HIT for key: ${formatMessage(key)}`);
             try {
                 const wrapper = JSON.parse(serializedData) as CacheWrapper<T>;
                 return wrapper.value; // Return only the user's data
             } catch (error) {
                 const parseError = error as Error;
                 this.logger.error(
-                    `Failed to parse JSON from Redis. Data: ${serializedData}, Error: ${parseError.message}, Key: ${formatMessage(key)}`,
+                    `GET: Failed to parse JSON from Redis. Data: ${serializedData}, Error: ${parseError.message}, Key: ${formatMessage(key)}`,
                 );
                 return undefined;
             }
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
-                `Redis GET error ${redisError.message} for key ${formatMessage(key)}`,
+                `GET: Redis error ${redisError.message} for key ${formatMessage(key)}`,
             );
             return undefined; // Or throw
         }
@@ -62,7 +62,7 @@ export class RedisCacheProvider implements CacheProvider {
             };
             const stringValue = JSON.stringify(wrapper);
 
-            this.logger.debug(`Setting cache for key: ${formatMessage(key)}`);
+            this.logger.debug(`SET: setting cache for key: ${formatMessage(key)}`);
 
             if (ttlInSeconds && ttlInSeconds > 0) {
                 // Use SET with EX option. This is 1 atomic command for set + TTL.
@@ -78,23 +78,23 @@ export class RedisCacheProvider implements CacheProvider {
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
-                `Redis HSET/EXPIRE error ${redisError.message} for key ${formatMessage(key)}`,
+                `SET: Redis HSET/EXPIRE error ${redisError.message} for key ${formatMessage(key)}`,
             );
         }
     }
 
     async del(key: string): Promise<void> {
         try {
-            this.logger.debug(`Deleting cache for key: ${formatMessage(key)}`);
+            this.logger.debug(`DEL: Deleting cache for key: ${formatMessage(key)}`);
             // .del returns the number of keys deleted, await it to ensure completion
             const keysDeleted = await this.redisClient.del(key);
             this.logger.debug(
-                `Deleted ${keysDeleted} keys for key: ${formatMessage(key)}`,
+                `DEL: Deleted ${keysDeleted} keys for key: ${formatMessage(key)}`,
             );
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
-                `Redis DEL error ${redisError.message} for key ${formatMessage(key)}`,
+                `DEL: Redis error ${redisError.message} for key ${formatMessage(key)}`,
             );
         }
     }
@@ -106,7 +106,7 @@ export class RedisCacheProvider implements CacheProvider {
             const serializedData = await this.redisClient.get(key);
             if (!serializedData) {
                 this.logger.debug(
-                    `Metadata MISS for key: ${formatMessage(key)}`,
+                    `GET: Metadata MISS for key: ${formatMessage(key)}`,
                 );
                 return undefined;
             }
@@ -117,13 +117,13 @@ export class RedisCacheProvider implements CacheProvider {
             );
 
             this.logger.debug(
-                `Metadata HIT for key: ${formatMessage(key)}, Age: ${ageInSeconds}s`,
+                `GET: Metadata HIT for key: ${formatMessage(key)}, Age: ${ageInSeconds}s`,
             );
             return { value: wrapper.value, ageInSeconds };
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
-                `Redis GET error ${redisError.message} for key ${formatMessage(key)}`,
+                `GET: Redis error ${redisError.message} for key ${formatMessage(key)}`,
             );
             return undefined;
         }
@@ -135,7 +135,7 @@ export class RedisCacheProvider implements CacheProvider {
         }
         try {
             const results = await this.redisClient.mget(keys);
-            this.logger.debug(`Cache MGET for ${keys.length} keys.`);
+            this.logger.debug(`MGET: Cache for ${keys.length} keys.`);
 
             return results.map((data, index) => {
                 if (data === null) {
@@ -148,7 +148,7 @@ export class RedisCacheProvider implements CacheProvider {
                 } catch (e) {
                     const parseError = e as Error;
                     this.logger.error(
-                        `Failed to parse JSON for key ${keys[index]}`,
+                        `MGET: Failed to parse JSON for key ${keys[index]}`,
                         parseError.message,
                     );
                     return undefined;
@@ -157,7 +157,7 @@ export class RedisCacheProvider implements CacheProvider {
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
-                `Redis MGET error in mget: ${redisError.message}`,
+                `MGET: Redis error in mget: ${redisError.message}`,
             );
             // On a total failure, return an array of undefined matching the input length.
             return new Array(keys.length).fill(undefined) as (T | undefined)[];
@@ -217,7 +217,7 @@ export class RedisCacheProvider implements CacheProvider {
             }
         } catch (error) {
             const redisError = error as Error;
-            this.logger.error(`Redis MSET error: ${redisError.message}`);
+            this.logger.error(`MSET: Redis error: ${redisError.message}`);
         }
     }
 
@@ -232,7 +232,7 @@ export class RedisCacheProvider implements CacheProvider {
             // Use Redis MGET to fetch all serialized data in one go
             const serializedResults = await this.redisClient.mget(keys);
             this.logger.debug(
-                `Cache MGET for ${keys.length} keys for metadata lookup.`,
+                `MGET: Cache for ${keys.length} keys for metadata lookup.`,
             );
 
             // Map over the results to parse and add age metadata
@@ -255,7 +255,7 @@ export class RedisCacheProvider implements CacheProvider {
                 } catch (e) {
                     const parseError = e as Error;
                     this.logger.error(
-                        `Failed to parse JSON for key ${formatMessage(key)} in mgetWithMetadata`,
+                        `MGET: Failed to parse JSON for key ${formatMessage(key)} in mgetWithMetadata`,
                         parseError.message,
                     );
                     // Return undefined for individual parse failures
@@ -265,7 +265,7 @@ export class RedisCacheProvider implements CacheProvider {
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(
-                `Redis MGET error in mgetWithMetadata: ${redisError.message}`,
+                `MGET: error in mgetWithMetadata: ${redisError.message}`,
             );
             // On a total network/Redis error, return an array of undefined matching input length
             return new Array(keys.length).fill(undefined) as (
