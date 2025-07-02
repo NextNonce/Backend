@@ -193,6 +193,21 @@ export class BalanceService {
         walletAddresses: string[],
         chainNames: string[] | undefined = undefined,
     ): Promise<PortfolioBalancesDto> {
+        if (walletAddresses.length === 0) {
+            this.logger.warn(
+                `No wallet addresses provided for portfolio balances.`,
+            );
+            return {
+                actual: true,
+                totalBalance: {
+                    balanceQuote: new Decimal(0),
+                    balanceQuoteChange: null,
+                    balanceQuoteChangePercent: null,
+                },
+                assetBalances: [],
+            };
+        }
+
         if (!chainNames) {
             chainNames = this.chainService
                 .getAllChains()
