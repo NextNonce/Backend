@@ -48,6 +48,11 @@ export class PortfolioWalletService {
         userId: string,
         createPortfolioWalletDto: CreatePortfolioWalletDto,
     ): Promise<{ portfolioWallet: PortfolioWallet; wallet: Wallet }> {
+        this.logger.debug(
+            `Adding wallet to portfolio ${portfolioId} for user ${userId} with data ${JSON.stringify(
+                createPortfolioWalletDto,
+            )}`,
+        );
         await this.portfolioService.findOneAndVerifyAccess({
             id: portfolioId,
             userId,
@@ -120,7 +125,7 @@ export class PortfolioWalletService {
             )}`,
         );
         await this.cachePortfolioWalletRecord(portfolioWalletRecord);
-        await this.delCachedAll(portfolioId); // delete all cached portfolio wallets
+        await this.patchCachedAll(portfolioId, portfolioWalletRecord);
         return portfolioWalletRecord;
     }
 
@@ -145,9 +150,14 @@ export class PortfolioWalletService {
             },
             wallet: link.wallet,
         }));
-        this.logger.log(`Found portfolio wallets ${JSON.stringify(result)}`);
-        await this.cacheAll(portfolioId, result);
-        return result;
+        const sortedResult = result.sort(
+            (a, b) =>
+                a.portfolioWallet.createdAt.getTime() -
+                b.portfolioWallet.createdAt.getTime(),
+        );
+        this.logger.debug(`Found portfolio wallets ${JSON.stringify(sortedResult)}`);
+        await this.cacheAll(portfolioId, sortedResult);
+        return sortedResult;
     }
 
     private async cachePortfolioWalletRecord(portfolioWalletRecord: {
