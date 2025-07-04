@@ -2,7 +2,6 @@ import {
     Controller,
     Get,
     Param,
-    Sse,
     UsePipes,
     ValidationPipe,
 } from '@nestjs/common';
@@ -51,6 +50,6 @@ export class WalletController {
     ): Promise<WalletBalancesDto> {
         return await this.balanceService.getWalletBalances(
             walletIdentifierDto.address,
-        );;
+        );
     }
 }

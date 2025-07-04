@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AddressUtils } from '@/wallet/utils/address.utils';
 import { WalletTypeUtils } from '@/wallet/utils/wallet-type.utils';
-import { CACHE_TTL_ONE_HOUR } from '@/cache/constants/cache.constants';
+import { CACHE_TTL_ONE_HOUR, CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class WalletService {
@@ -30,54 +30,85 @@ export class WalletService {
 
     async findOrCreate(
         walletAddress: string,
-        db?: Prisma.TransactionClient,
     ): Promise<Wallet> {
-        const { address, chainType } =
-            this.extractAddressAndChainType(walletAddress);
-        let prisma: DatabaseService | Prisma.TransactionClient;
-        if (!db) {
-            prisma = this.databaseService;
-            const wallet: Wallet | undefined =
-                await this.findByAddress(address);
-            if (wallet) {
-                return wallet;
-            }
-        } else {
-            prisma = db;
+        const { existingWallet, creationData } = await this.resolveWalletData(walletAddress);
+
+        if (existingWallet) {
+            return existingWallet;
         }
-        const walletType: WalletType = await this.walletTypeUtils.getWalletType(
-            address,
-            chainType,
-        );
+
+        const wallet = await this.upsertInTransaction(creationData!, this.databaseService);
+        await this.afterUpsert(wallet);
+        return wallet
+    }
+
+    /**
+     * Gathers all data needed to create a wallet.
+     * Checks if the wallet exists first to avoid network calls.
+     */
+    public async resolveWalletData(walletAddress: string): Promise<{
+        existingWallet?: Wallet;
+        creationData?: { address: string; chainType: ChainType; walletType: WalletType };
+    }> {
+        const { address, chainType } = this.extractAddressAndChainType(walletAddress);
+
+        // 1. Check DB first to avoid a slow network call if possible
+        const existingWallet =  await this.findByAddress(address);;
+
+        if (existingWallet) {
+            return { existingWallet };
+        }
+
+        // 2. Wallet is new, so we call getWalletType
+        const walletType = await this.walletTypeUtils.getWalletType(address, chainType);
+
+        // 3. Return the data needed to create the new wallet
+        return { creationData: { address, chainType, walletType } };
+    }
+
+    public async upsertInTransaction(
+        walletData: { address: string; walletType: WalletType; chainType: ChainType },
+        prisma: Prisma.TransactionClient | DatabaseService,
+    ): Promise<Wallet> {
         this.logger.log(
-            `Upserting wallet with address ${address} and type ${walletType}.`,
+            `Upserting wallet with address ${walletData.address}, wallet type ${walletData.walletType}, chain type ${walletData.chainType}.`,
         );
         try {
-            const wallet: Wallet = await prisma.wallet.upsert({
+            return await prisma.wallet.upsert({
                 where: {
-                    address,
+                    address: walletData.address,
                 },
                 update: {},
                 create: {
-                    address,
-                    walletType,
-                    chainType,
+                    address: walletData.address,
+                    walletType: walletData.walletType,
+                    chainType: walletData.chainType,
                 },
             });
-            if (!db) await this.cacheWalletByAddress(wallet, address); // can be dangerous if transaction fails
-            return wallet;
         } catch (err) {
             const error = err as Error;
             // Handle unique constraint error: if duplicate, fetch the existing wallet
             if ((error as PrismaClientKnownRequestError).code === 'P2002') {
                 this.logger.warn(
-                    `Wallet with address ${address} already exists, fetching existing wallet.`,
+                    `Wallet with address ${walletData.address} already exists, fetching existing wallet.`,
                 );
-                const existingWallet = await this.findByAddress(address);
-                if (existingWallet) return existingWallet;
+                const existingWallet = await prisma.wallet.findFirst({
+                    where: { address: walletData.address },
+                }) || undefined;
+
+                if (!existingWallet) {
+                    // This is a safeguard for a very unlikely scenario
+                    throw new Error(`Fatal: Could not find wallet ${walletData.address} after a P2202 error.`);
+                }
+                return existingWallet;
             }
             throw error;
         }
+    }
+
+
+    public async afterUpsert(wallet: Wallet): Promise<void> {
+        await this.cacheWalletByAddress(wallet, wallet.address);
     }
 
     async findByAddress(address: string): Promise<Wallet | undefined> {
@@ -160,12 +191,12 @@ export class WalletService {
         await this.cacheService.set(
             pointerKey,
             wallet.id,
-            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_HOUR,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_WEEK,
         );
         await this.cacheService.set(
             canonicalKey,
             wallet,
-            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_HOUR,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_WEEK,
         );
     }
 
