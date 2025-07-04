@@ -37,23 +37,27 @@ export class RateLimiterService {
                 await limiter.consume(key);
                 isAllowed = true;
             } catch (rejRes) {
-                if (rejRes instanceof Error) {
-                    this.logger.error(
-                        `Rate limit provider error during rate limit consumption, stopping retry: ${rejRes.message}`,
-                    );
-                    // Re-throwing here will crash the request, which is appropriate for a DB error.
-                    throw rejRes;
-                } else if (rejRes instanceof RateLimiterRes) {
+                if (rejRes instanceof RateLimiterRes) {
                     // The rate limit was exceeded. Wait for the specified duration and try again.
                     const retryAfter =
                         (limiter.duration * 1000) / limiter.points;
                     this.logger.warn(
-                        `Rate limit exceeded for keyPrefix '${limiter.keyPrefix}'. Waiting ${retryAfter / 1000}s before retrying...`,
+                        `Rate limit exceeded for keyPrefix (“${limiter.keyPrefix}:${key}”). Sleeping ${retryAfter / 1000}s before retrying...`,
                     );
                     await new Promise((resolve) =>
                         setTimeout(resolve, retryAfter),
                     );
+                    continue;
                 }
+                if (rejRes instanceof Error) {
+                    // Handle other errors, such as network issues
+                    this.logger.error(
+                        `Error while consuming rate limiter for keyPrefix (“${limiter.keyPrefix}:${key}”): ${rejRes.message}`,
+                    );
+                    await this.rateLimiterProvider.handleConsumeError(rejRes);
+                    continue;
+                }
+                throw rejRes;
             }
         }
     }
