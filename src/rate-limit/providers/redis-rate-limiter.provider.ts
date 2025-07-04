@@ -37,4 +37,16 @@ export class RedisRateLimiterProvider implements RateLimiterProvider {
             ...options,
         });
     }
+
+    async handleConsumeError(rejection: Error): Promise<void> {
+        if (this.dedicatedClient.status !== 'ready') {
+            await new Promise<void>(resolve =>
+                this.dedicatedClient.once('ready', () => resolve()),
+            );
+        } else {
+            // already ready but still got an error: back off a bit
+            await new Promise((r) => setTimeout(r, 100));
+        }
+        this.logger.log(`Resuming rate‐limiter.consume() now that Redis is ready.`);
+    }
 }
