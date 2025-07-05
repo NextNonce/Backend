@@ -95,12 +95,19 @@ export class PortfolioWalletService {
             `Adding wallet with address ${createPortfolioWalletDto.address} to portfolio ${portfolioId} of user ${userId}`,
         );
 
+        const { existingWallet, creationData } = await this.walletService.resolveWalletData(createPortfolioWalletDto.address);
+
         const portfolioWalletRecord = await this.databaseService.$transaction(
             async (db) => {
-                const wallet: Wallet = await this.walletService.findOrCreate(
-                    createPortfolioWalletDto.address,
-                    db,
-                );
+                let wallet: Wallet;
+                if (existingWallet) {
+                    wallet = existingWallet;
+                } else {
+                    wallet = await this.walletService.upsertInTransaction(
+                        creationData!,
+                        db,
+                    );
+                }
                 const portfolioWallet: PortfolioWallet =
                     await db.portfolioWallet.upsert({
                         where: {
@@ -124,6 +131,7 @@ export class PortfolioWalletService {
                 portfolioWalletRecord,
             )}`,
         );
+        await this.walletService.afterUpsert(portfolioWalletRecord.wallet)
         await this.cachePortfolioWalletRecord(portfolioWalletRecord);
         await this.patchCachedAll(portfolioId, portfolioWalletRecord);
         return portfolioWalletRecord;
