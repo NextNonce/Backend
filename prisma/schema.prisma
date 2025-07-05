@@ -102,6 +102,7 @@ model Wallet {
     watchlists     Watchlist[] // many-to-many with Watchlists
     portfolioLinks PortfolioWallet[]
 
+    @@index([address])
     @@map("wallets")
 }
 
@@ -109,6 +110,7 @@ model Chain {
     id        String    @id @default(uuid())
     name      String    @unique
     chainType ChainType
+    logo      String
     tokens    Token[] // One-to-many relation to tokens
     createdAt DateTime  @default(now())
     updatedAt DateTime  @updatedAt
@@ -131,14 +133,16 @@ model Token {
     id              String        @id @default(uuid())
     chainId         String
     chain           Chain         @relation(fields: [chainId], references: [id])
-    address         String
-    tokenMetadataId String        @unique
+    address         String // "native" for native tokens
+    tokenMetadataId String
     tokenMetadata   TokenMetadata @relation(fields: [tokenMetadataId], references: [id])
     unifiedTokenId  String?
     unifiedToken    UnifiedToken? @relation(fields: [unifiedTokenId], references: [id])
+    prices          TokenPrice[]
     createdAt       DateTime      @default(now())
     updatedAt       DateTime      @updatedAt
 
+    @@unique([chainId, address])
     @@index([address])
     @@map("tokens")
 }
@@ -148,14 +152,26 @@ model TokenMetadata {
     symbol       String
     name         String
     decimals     Int
-    logo         String
+    logo         String?
     description  String?
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @updatedAt
-    Token        Token?
+    tokens       Token[]
     UnifiedToken UnifiedToken?
 
     @@map("token_metadata")
+}
+
+model TokenPrice {
+    id        String   @id @default(uuid())
+    tokenId   String
+    token     Token    @relation(fields: [tokenId], references: [id])
+    priceUsd  Decimal  @db.Decimal(38, 18)
+    timestamp DateTime @default(now())
+
+    @@unique([tokenId, timestamp])
+    @@index([timestamp])
+    @@map("token_prices")
 }
 
 model Watchlist {

@@ -14,6 +14,7 @@ import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { PortfolioIdentifierDto } from '@/portfolio/dto/portfolio-identifier.dto';
 import { PortfolioDto } from '@/portfolio/dto/portfolio.dto';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { PortfolioBalancesDto } from '@/balance/dto/portfolio-balances.dto';
 
 @ApiTags('portfolios')
 @Auth()
@@ -35,7 +36,7 @@ export class PortfolioController {
         type: PortfolioDto,
         isArray: true,
     })
-    async findAll(@CurrentUser() user: User): Promise<PortfolioDto[]> {
+    async findAll(@CurrentUser() user: User): Promise<PortfolioDto[]> { // need
         const portfolios: Portfolio[] = await this.portfolioService.findAll(
             user.id,
         );
@@ -61,6 +62,18 @@ export class PortfolioController {
                 requireOwnership: false,
             });
         return PortfolioDto.fromModel(portfolio);
+    }
+
+    @Get(':id/balances/cached')
+    getCachedBalances(
+        @CurrentUser() user: User,
+        @Param() portfolioIdentifierDto: PortfolioIdentifierDto,
+    ): Promise<PortfolioBalancesDto> {
+
+        return this.portfolioService.getCachedBalances(
+            portfolioIdentifierDto.id,
+            user.id,
+        );
     }
 
     /*@Delete(':id')

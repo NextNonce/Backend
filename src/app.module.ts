@@ -10,11 +10,19 @@ import { PortfolioModule } from '@/portfolio/portfolio.module';
 import { WalletModule } from './wallet/wallet.module';
 import { ConfigModule } from '@nestjs/config';
 import { PortfolioWalletModule } from '@/portfolio-wallet/portfolio-wallet.module';
+import { BalanceModule } from './balance/balance.module';
+import { TokenModule } from './token/token.module';
+import { MetadataModule } from './metadata/metadata.module';
+import { ChainModule } from './chain/chain.module';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { RedisModule } from './common/redis/redis.module';
+import { PriceModule } from './price/price.module';
 
 @Module({
     imports: [
         AppLoggerModule,
         DatabaseModule,
+        RedisModule,
         CacheModule,
         AuthModule,
         UserModule,
@@ -25,6 +33,12 @@ import { PortfolioWalletModule } from '@/portfolio-wallet/portfolio-wallet.modul
             envFilePath: '.env',
         }),
         PortfolioWalletModule,
+        BalanceModule,
+        TokenModule,
+        MetadataModule,
+        ChainModule,
+        RateLimitModule,
+        PriceModule,
     ],
     controllers: [AppController],
     providers: [AppService],

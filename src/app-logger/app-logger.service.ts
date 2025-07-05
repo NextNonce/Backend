@@ -46,6 +46,36 @@ export class AppLoggerService extends ConsoleLogger {
         }
     }
 
+    /**
+     * Overrides the default ConsoleLogger's timestamp creator.
+     */
+    protected getTimestamp(): string {
+        const now = new Date();
+
+        // --- 1. Date Parts ---
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0'); // .getMonth() is 0-indexed, so we add 1
+        const year = now.getFullYear();
+        const datePart = `${day}.${month}.${year}`;
+
+        // --- 2. Time Parts (with AM/PM) ---
+        const rawHours = now.getHours();
+        const ampm = rawHours >= 12 ? 'PM' : 'AM';
+        let hours12 = rawHours % 12;
+        hours12 = hours12 ? hours12 : 12; // The hour '0' should be '12' for AM/PM format
+        const hours = String(hours12).padStart(2, '0');
+
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+
+        // --- 3. CHOOSE SEPARATOR ---
+        const millisecondSeparator = '.'; // Use '.' for ".973" or ':' for ":973"
+
+        // --- 4. Combine Everything ---
+        return `${datePart}, ${hours}:${minutes}:${seconds}${millisecondSeparator}${milliseconds} ${ampm}`;
+    }
+
     log(message: any, context?: string) {
         const entry = `${context ? `[${context}] ` : `${this.context}`}\t${message}`;
         this.writeToFile(this.logFilePath, entry).catch(console.error);

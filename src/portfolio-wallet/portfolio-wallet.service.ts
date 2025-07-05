@@ -7,6 +7,7 @@ import { PortfolioWallet, Wallet } from '@prisma/client';
 import { PortfolioService } from '@/portfolio/portfolio.service';
 import { CreatePortfolioWalletDto } from '@/portfolio-wallet/dto/create-portfolio-wallet.dto';
 import { ConfigService } from '@nestjs/config';
+import { CACHE_TTL_FOUR_WEEKS, CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class PortfolioWalletService {
@@ -47,6 +48,11 @@ export class PortfolioWalletService {
         userId: string,
         createPortfolioWalletDto: CreatePortfolioWalletDto,
     ): Promise<{ portfolioWallet: PortfolioWallet; wallet: Wallet }> {
+        this.logger.debug(
+            `Adding wallet to portfolio ${portfolioId} for user ${userId} with data ${JSON.stringify(
+                createPortfolioWalletDto,
+            )}`,
+        );
         await this.portfolioService.findOneAndVerifyAccess({
             id: portfolioId,
             userId,
@@ -89,12 +95,19 @@ export class PortfolioWalletService {
             `Adding wallet with address ${createPortfolioWalletDto.address} to portfolio ${portfolioId} of user ${userId}`,
         );
 
+        const { existingWallet, creationData } = await this.walletService.resolveWalletData(createPortfolioWalletDto.address);
+
         const portfolioWalletRecord = await this.databaseService.$transaction(
             async (db) => {
-                const wallet: Wallet = await this.walletService.findOrCreate(
-                    createPortfolioWalletDto.address,
-                    db,
-                );
+                let wallet: Wallet;
+                if (existingWallet) {
+                    wallet = existingWallet;
+                } else {
+                    wallet = await this.walletService.upsertInTransaction(
+                        creationData!,
+                        db,
+                    );
+                }
                 const portfolioWallet: PortfolioWallet =
                     await db.portfolioWallet.upsert({
                         where: {
@@ -118,8 +131,9 @@ export class PortfolioWalletService {
                 portfolioWalletRecord,
             )}`,
         );
+        await this.walletService.afterUpsert(portfolioWalletRecord.wallet)
         await this.cachePortfolioWalletRecord(portfolioWalletRecord);
-        await this.delCachedAll(portfolioId); // delete all cached portfolio wallets
+        await this.patchCachedAll(portfolioId, portfolioWalletRecord);
         return portfolioWalletRecord;
     }
 
@@ -144,9 +158,14 @@ export class PortfolioWalletService {
             },
             wallet: link.wallet,
         }));
-        this.logger.log(`Found portfolio wallets ${JSON.stringify(result)}`);
-        await this.cacheAll(portfolioId, result);
-        return result;
+        const sortedResult = result.sort(
+            (a, b) =>
+                a.portfolioWallet.createdAt.getTime() -
+                b.portfolioWallet.createdAt.getTime(),
+        );
+        this.logger.debug(`Found portfolio wallets ${JSON.stringify(sortedResult)}`);
+        await this.cacheAll(portfolioId, sortedResult);
+        return sortedResult;
     }
 
     private async cachePortfolioWalletRecord(portfolioWalletRecord: {
@@ -160,7 +179,7 @@ export class PortfolioWalletService {
         await this.cacheService.set(
             cacheKey,
             portfolioWalletRecord,
-            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_WEEK,
         );
     }
 
@@ -190,8 +209,22 @@ export class PortfolioWalletService {
         await this.cacheService.set(
             cacheKeyAll,
             PortfolioWalletRecords,
-            this.isTestingMode ? this.testingCacheTTL : 60 * 60,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_FOUR_WEEKS,
         );
+    }
+
+    private async patchCachedAll(
+        portfolioId: string,
+        newEntry: { portfolioWallet: PortfolioWallet; wallet: Wallet },
+    ) {
+        // 1) Try to read the existing cached list
+        const existing = await this.getCachedAll(portfolioId);
+
+        // 2) If it exists, append; otherwise start a new array
+        const updated = existing ? [...existing, newEntry] : [newEntry];
+
+        // 3) Write it back with the same TTL as cacheAll
+        await this.cacheAll(portfolioId, updated);
     }
 
     private async getCachedAll(

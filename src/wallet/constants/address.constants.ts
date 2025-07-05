@@ -6,11 +6,11 @@ export const ADDRESS_LENGTHS = {
     STARKNET: STARKNET_ADDRESS_LENGTH,
 };
 
-export const WALLET_ADDRESS_MIN_LENGTH = Math.min(
+export const ADDRESS_MIN_LENGTH = Math.min(
     EVM_ADDRESS_LENGTH,
     STARKNET_ADDRESS_LENGTH,
 );
-export const WALLET_ADDRESS_MAX_LENGTH = Math.max(
+export const ADDRESS_MAX_LENGTH = Math.max(
     EVM_ADDRESS_LENGTH,
     STARKNET_ADDRESS_LENGTH,
 );

@@ -49,7 +49,7 @@ export class PortfolioWalletController {
         description: 'Wallet created in the portfolio',
         type: PortfolioWalletDto,
     })
-    async addWallet(
+    async createWallet(
         @CurrentUser() user: User,
         @Param() portfolioIdentifierDto: PortfolioIdentifierDto,
         @Body() createPortfolioWalletDto: CreatePortfolioWalletDto,

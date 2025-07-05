@@ -8,10 +8,13 @@ import {
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
-import { Portfolio, PortfolioAccess, Prisma } from '@prisma/client';
+import { Portfolio, PortfolioAccess, PortfolioWallet, Prisma, Wallet } from '@prisma/client';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { PortfolioWalletService } from '@/portfolio-wallet/portfolio-wallet.service';
+import { CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
+import { PortfolioBalancesDto } from '@/balance/dto/portfolio-balances.dto';
+import { BalanceService } from '@/balance/balance.service';
 
 @Injectable()
 export class PortfolioService {
@@ -19,6 +22,7 @@ export class PortfolioService {
     constructor(
         private readonly databaseService: DatabaseService,
         private readonly cacheService: CacheService,
+        private readonly balanceService: BalanceService,
         @Inject(forwardRef(() => PortfolioWalletService))
         private readonly portfolioWalletService: PortfolioWalletService,
     ) {
@@ -43,7 +47,7 @@ export class PortfolioService {
             'portfolio',
             portfolio.id,
         );
-        await this.cacheService.set(cacheKey, portfolio, 60 * 60);
+        await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_WEEK);
         const cacheKeyAll = this.cacheService.getCacheKey('portfolios', {
             userId,
         });
@@ -64,8 +68,15 @@ export class PortfolioService {
             await this.databaseService.portfolio.findMany({
                 where: { ownerId: userId },
             });
-        await this.cacheService.set(cacheKeyAll, portfolios, 60 * 60);
-        return portfolios;
+        const sortedPortfolios =
+            portfolios.sort((a: Portfolio, b: Portfolio) => a.createdAt.getTime() - b.createdAt.getTime()
+        );
+        await this.cacheService.set(
+            cacheKeyAll,
+            sortedPortfolios,
+            CACHE_TTL_ONE_WEEK,
+        );
+        return sortedPortfolios;
     }
 
     async findOneAndVerifyAccess({
@@ -118,8 +129,22 @@ export class PortfolioService {
             throwLogged(new NotFoundException(`Portfolio not found`));
         }
 
-        await this.cacheService.set(cacheKey, portfolio, 60 * 60);
+        await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_WEEK);
         return portfolio;
+    }
+
+    async getCachedBalances(
+        portfolioId: string,
+        userId: string,
+    ): Promise<PortfolioBalancesDto> {
+        const wallets: { portfolioWallet: PortfolioWallet; wallet: Wallet }[] = await this.portfolioWalletService.findAll(
+            portfolioId,
+            userId,
+        );
+
+        return await this.balanceService.getPortfolioBalancesFromCache(
+            wallets.map((wallet) => wallet.wallet.address),
+        );
     }
 
     /*async update(id: number, updatePortfolioDto: UpdatePortfolioDto) {

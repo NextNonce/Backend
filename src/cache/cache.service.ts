@@ -4,6 +4,7 @@ import {
     CACHE_PROVIDER,
     CacheProvider,
 } from '@/cache/interfaces/cache-provider.interface';
+import { CacheMSetItem } from '@/cache/interfaces/cache-mset-item.interface';
 
 @Injectable()
 export class CacheService {
@@ -18,12 +19,32 @@ export class CacheService {
         this.version = this.configService.get<string>('CACHE_VERSION') || 'v1';
     }
 
+    async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
+        await this.cacheProvider.set(key, value, ttlSeconds);
+    }
+
+    async mset<T>(items: CacheMSetItem<T>[]): Promise<void> {
+        await this.cacheProvider.mset<T>(items);
+    }
+
     async get<T>(key: string): Promise<T | undefined> {
         return await this.cacheProvider.get<T>(key);
     }
 
-    async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
-        await this.cacheProvider.set(key, value, ttlSeconds);
+    async mget<T>(keys: string[]): Promise<(T | undefined)[]> {
+        return await this.cacheProvider.mget<T>(keys);
+    }
+
+    async getWithMetadata<T>(
+        key: string,
+    ): Promise<{ value: T; ageInSeconds: number } | undefined> {
+        return await this.cacheProvider.getWithMetadata<T>(key);
+    }
+
+    async mgetWithMetadata<T>(
+        keys: string[],
+    ): Promise<({ value: T; ageInSeconds: number } | undefined)[]> {
+        return await this.cacheProvider.mgetWithMetadata<T>(keys);
     }
 
     async del(key: string): Promise<void> {
@@ -33,7 +54,7 @@ export class CacheService {
     // Overload: for a single identifier
     public getCacheKey(domain: string, id: string): string;
 
-    // Overload: for composite key from multiple fields
+    // Overload: for a composite key from multiple fields
     public getCacheKey(domain: string, fields: Record<string, string>): string;
 
     public getCacheKey(

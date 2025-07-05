@@ -14,6 +14,7 @@ import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { PortfolioService } from '@/portfolio/portfolio.service';
 import { CreatePortfolioDto } from '@/portfolio/dto/create-portfolio.dto';
+import { CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class UserService {
@@ -123,8 +124,8 @@ export class UserService {
             providerUid: authUserId,
         });
 
-        await this.cacheService.set(pointerKey, user.id, 60 * 60);
-        await this.cacheService.set(canonicalKey, user, 60 * 60);
+        await this.cacheService.set(pointerKey, user.id, CACHE_TTL_ONE_WEEK);
+        await this.cacheService.set(canonicalKey, user, CACHE_TTL_ONE_WEEK);
     }
 
     private async getCachedUserByAuthUserId(

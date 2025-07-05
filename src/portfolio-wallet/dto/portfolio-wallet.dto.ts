@@ -1,15 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-    WALLET_ADDRESS_MAX_LENGTH,
-    WALLET_ADDRESS_MIN_LENGTH,
+    ADDRESS_MAX_LENGTH,
+    ADDRESS_MIN_LENGTH,
 } from '@/wallet/constants/address.constants';
 import { ChainType, PortfolioWallet, Wallet, WalletType } from '@prisma/client';
 
 export class PortfolioWalletDto {
     @ApiProperty({
         type: 'string',
-        minLength: WALLET_ADDRESS_MIN_LENGTH,
-        maxLength: WALLET_ADDRESS_MAX_LENGTH,
+        minLength: ADDRESS_MIN_LENGTH,
+        maxLength: ADDRESS_MAX_LENGTH,
     })
     address: string;
     @ApiProperty({

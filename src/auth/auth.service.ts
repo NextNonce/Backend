@@ -10,6 +10,7 @@ import {
 import { CacheService } from '@/cache/cache.service';
 import { AuthUserDto } from '@/auth/dto/auth-user.dto';
 import { Prisma } from '@prisma/client';
+import { CACHE_TTL_ONE_HOUR } from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class AuthService {
@@ -70,8 +71,12 @@ export class AuthService {
             token,
         });
 
-        await this.cacheService.set(pointerKey, authUser.id, 60 * 60);
-        await this.cacheService.set(canonicalKey, authUser, 60 * 60);
+        await this.cacheService.set(
+            pointerKey,
+            authUser.id,
+            CACHE_TTL_ONE_HOUR,
+        );
+        await this.cacheService.set(canonicalKey, authUser, CACHE_TTL_ONE_HOUR);
     }
 
     private async getCachedAuthUserByToken(
