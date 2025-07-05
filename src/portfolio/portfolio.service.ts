@@ -12,7 +12,7 @@ import { Portfolio, PortfolioAccess, PortfolioWallet, Prisma, Wallet } from '@pr
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { PortfolioWalletService } from '@/portfolio-wallet/portfolio-wallet.service';
-import { CACHE_TTL_ONE_HOUR } from '@/cache/constants/cache.constants';
+import { CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
 import { PortfolioBalancesDto } from '@/balance/dto/portfolio-balances.dto';
 import { BalanceService } from '@/balance/balance.service';
 
@@ -47,7 +47,7 @@ export class PortfolioService {
             'portfolio',
             portfolio.id,
         );
-        await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_HOUR);
+        await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_WEEK);
         const cacheKeyAll = this.cacheService.getCacheKey('portfolios', {
             userId,
         });
@@ -74,7 +74,7 @@ export class PortfolioService {
         await this.cacheService.set(
             cacheKeyAll,
             sortedPortfolios,
-            CACHE_TTL_ONE_HOUR,
+            CACHE_TTL_ONE_WEEK,
         );
         return sortedPortfolios;
     }
@@ -129,7 +129,7 @@ export class PortfolioService {
             throwLogged(new NotFoundException(`Portfolio not found`));
         }
 
-        await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_HOUR);
+        await this.cacheService.set(cacheKey, portfolio, CACHE_TTL_ONE_WEEK);
         return portfolio;
     }
 

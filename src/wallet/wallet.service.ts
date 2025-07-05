@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AddressUtils } from '@/wallet/utils/address.utils';
 import { WalletTypeUtils } from '@/wallet/utils/wallet-type.utils';
-import { CACHE_TTL_ONE_HOUR, CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
+import { CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class WalletService {
@@ -53,7 +53,7 @@ export class WalletService {
         const { address, chainType } = this.extractAddressAndChainType(walletAddress);
 
         // 1. Check DB first to avoid a slow network call if possible
-        const existingWallet =  await this.findByAddress(address);;
+        const existingWallet =  await this.findByAddress(address);
 
         if (existingWallet) {
             return { existingWallet };
@@ -162,7 +162,7 @@ export class WalletService {
         await this.cacheService.set(
             cacheKey,
             wallet,
-            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_HOUR,
+            this.isTestingMode ? this.testingCacheTTL : CACHE_TTL_ONE_WEEK,
         );
         return wallet;
     }
