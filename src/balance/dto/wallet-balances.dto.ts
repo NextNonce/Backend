@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 
 export class WalletBalancesDto {
     @Type(() => TotalBalanceDto)
-    totalBalance: TotalBalanceDto | null;
+    totalBalance: TotalBalanceDto;
     @Type(() => AssetBalanceDto)
     assetBalances: AssetBalanceDto[];
 }

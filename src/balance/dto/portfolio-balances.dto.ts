@@ -3,6 +3,6 @@ import { TotalBalanceDto } from '@/balance/dto/balance.dto';
 
 export class PortfolioBalancesDto {
     actual: boolean;
-    totalBalance: TotalBalanceDto | null;
+    totalBalance: TotalBalanceDto;
     assetBalances: AssetBalanceDto[];
 }

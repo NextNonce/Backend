@@ -152,7 +152,7 @@ export class BalanceService {
                 return staleCache.value;
             }
             // Otherwise, return an empty object.
-            return { assetBalances: [], totalBalance: null }; // No token balances provided and no cache available so return empty balances
+            return { assetBalances: [], totalBalance: new TotalBalanceDto(/*balanceQuote = */new Decimal(0)) }; // No token balances provided and no cache available so return empty balances
         }
 
         this.logger.log(
@@ -329,7 +329,7 @@ export class BalanceService {
             );
             return {
                 actual: false,
-                totalBalance: null,
+                totalBalance: new TotalBalanceDto(/*balanceQuote = */new Decimal(0)),
                 assetBalances: [],
             };
         }
@@ -416,9 +416,9 @@ export class BalanceService {
 
     private calculateTotalBalance(
         assetBalances: AssetBalanceDto[],
-    ): TotalBalanceDto | null {
+    ): TotalBalanceDto {
         if (assetBalances.length === 0) {
-            return null; // No balances to sum
+            return new TotalBalanceDto(/*balanceQuote = */new Decimal(0))
         }
         const balances = assetBalances.map(
             (assetBalance) => assetBalance.balance,
