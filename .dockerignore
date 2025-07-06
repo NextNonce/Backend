@@ -1,0 +1,28 @@
+# dependencies & build output
+node_modules
+dist
+
+# test artifacts
+coverage
+test
+*.log
+
+# environment & secrets
+.env
+
+# VCS & editor metadata
+.git
+.gitignore
+.vscode
+*.sw?
+
+# Docker-specific files
+Dockerfile
+docker-compose*.yml
+
+# SSH
+.ssh
+
+# OS cruft
+.DS_Store
+Thumbs.db
