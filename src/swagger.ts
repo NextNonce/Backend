@@ -14,10 +14,7 @@ export function setupSwagger(app: INestApplication) {
         .build();
 
     const document = SwaggerModule.createDocument(app, config, {
-        extraModels: [
-            TokenDto,
-            UnifiedTokenDto,
-        ],
+        extraModels: [TokenDto, UnifiedTokenDto],
     });
 
     SwaggerModule.setup('v1/docs', app, document);

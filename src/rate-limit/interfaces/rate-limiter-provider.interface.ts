@@ -8,5 +8,5 @@ export interface RateLimiterProvider {
         options: RateLimiterFlexibleOptions,
     ): Promise<RateLimiterStoreAbstract>;
 
-    handleConsumeError(rejection: Error): Promise<void>
+    handleConsumeError(rejection: Error): Promise<void>;
 }

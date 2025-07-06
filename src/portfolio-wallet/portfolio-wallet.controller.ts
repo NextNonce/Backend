@@ -16,7 +16,7 @@ import { Auth } from '@/auth/decorators';
 import { PortfolioWalletDto } from '@/portfolio-wallet/dto/portfolio-wallet.dto';
 import { CreatePortfolioWalletDto } from '@/portfolio-wallet/dto/create-portfolio-wallet.dto';
 
-@ApiTags('portfolios')
+@ApiTags('Portfolios')
 @Auth()
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 @Controller('portfolios')

@@ -5,6 +5,7 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
 import { UserInterceptor } from '@/user/interceptors/user.interceptor';
 import { ConfigService } from '@nestjs/config';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
+import { setupSwagger } from '@/swagger';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
@@ -16,8 +17,10 @@ async function bootstrap() {
     const { httpAdapter } = app.get(HttpAdapterHost);
     app.useGlobalFilters(new AllExceptionsFilter(configService, httpAdapter));
     app.useGlobalInterceptors(app.get(UserInterceptor));
-    app.enableCors(); // For now api is open to all origins (to everyone)
+    app.enableCors();
     app.setGlobalPrefix('v1');
+
+    setupSwagger(app);
 
     await app.listen(configService.get<string>('PORT') ?? 3000);
 }

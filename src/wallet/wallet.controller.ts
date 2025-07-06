@@ -14,7 +14,7 @@ import { Auth } from '@/auth/decorators';
 import { BalanceService } from '@/balance/balance.service';
 import { WalletBalancesDto } from '@/balance/dto/wallet-balances.dto';
 
-@ApiTags('wallets')
+@ApiTags('Wallets')
 @Auth()
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 @Controller('wallets')

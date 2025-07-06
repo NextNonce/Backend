@@ -10,7 +10,7 @@ export class WalletDto {
         type: 'string',
         minLength: ADDRESS_MIN_LENGTH,
         maxLength: ADDRESS_MAX_LENGTH,
-        example: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+        example: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
     })
     address: string;
     @ApiProperty({

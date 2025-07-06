@@ -109,13 +109,15 @@ export class PriceService {
                 value: {
                     price: p.priceUsd.toString(),
                 },
-                ttlInSeconds: CACHE_TTL_ONE_WEEK
+                ttlInSeconds: CACHE_TTL_ONE_WEEK,
             });
         });
 
         if (cacheItemsToSet.length > 0) {
             await this.cacheService.mset(cacheItemsToSet);
-            this.logger.debug(`Set ${cacheItemsToSet.length} prices-latest in cache without TTL.`);
+            this.logger.debug(
+                `Set ${cacheItemsToSet.length} prices-latest in cache without TTL.`,
+            );
         }
 
         if (cacheItemsToSetWithTTL.length > 0) {

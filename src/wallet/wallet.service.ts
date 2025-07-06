@@ -28,18 +28,20 @@ export class WalletService {
         this.testingCacheTTL = 5;
     }
 
-    async findOrCreate(
-        walletAddress: string,
-    ): Promise<Wallet> {
-        const { existingWallet, creationData } = await this.resolveWalletData(walletAddress);
+    async findOrCreate(walletAddress: string): Promise<Wallet> {
+        const { existingWallet, creationData } =
+            await this.resolveWalletData(walletAddress);
 
         if (existingWallet) {
             return existingWallet;
         }
 
-        const wallet = await this.upsertInTransaction(creationData!, this.databaseService);
+        const wallet = await this.upsertInTransaction(
+            creationData!,
+            this.databaseService,
+        );
         await this.afterUpsert(wallet);
-        return wallet
+        return wallet;
     }
 
     /**
@@ -48,26 +50,38 @@ export class WalletService {
      */
     public async resolveWalletData(walletAddress: string): Promise<{
         existingWallet?: Wallet;
-        creationData?: { address: string; chainType: ChainType; walletType: WalletType };
+        creationData?: {
+            address: string;
+            chainType: ChainType;
+            walletType: WalletType;
+        };
     }> {
-        const { address, chainType } = this.extractAddressAndChainType(walletAddress);
+        const { address, chainType } =
+            this.extractAddressAndChainType(walletAddress);
 
         // 1. Check DB first to avoid a slow network call if possible
-        const existingWallet =  await this.findByAddress(address);
+        const existingWallet = await this.findByAddress(address);
 
         if (existingWallet) {
             return { existingWallet };
         }
 
         // 2. Wallet is new, so we call getWalletType
-        const walletType = await this.walletTypeUtils.getWalletType(address, chainType);
+        const walletType = await this.walletTypeUtils.getWalletType(
+            address,
+            chainType,
+        );
 
         // 3. Return the data needed to create the new wallet
         return { creationData: { address, chainType, walletType } };
     }
 
     public async upsertInTransaction(
-        walletData: { address: string; walletType: WalletType; chainType: ChainType },
+        walletData: {
+            address: string;
+            walletType: WalletType;
+            chainType: ChainType;
+        },
         prisma: Prisma.TransactionClient | DatabaseService,
     ): Promise<Wallet> {
         this.logger.log(
@@ -92,20 +106,22 @@ export class WalletService {
                 this.logger.warn(
                     `Wallet with address ${walletData.address} already exists, fetching existing wallet.`,
                 );
-                const existingWallet = await prisma.wallet.findFirst({
-                    where: { address: walletData.address },
-                }) || undefined;
+                const existingWallet =
+                    (await prisma.wallet.findFirst({
+                        where: { address: walletData.address },
+                    })) || undefined;
 
                 if (!existingWallet) {
                     // This is a safeguard for a very unlikely scenario
-                    throw new Error(`Fatal: Could not find wallet ${walletData.address} after a P2202 error.`);
+                    throw new Error(
+                        `Fatal: Could not find wallet ${walletData.address} after a P2202 error.`,
+                    );
                 }
                 return existingWallet;
             }
             throw error;
         }
     }
-
 
     public async afterUpsert(wallet: Wallet): Promise<void> {
         await this.cacheWalletByAddress(wallet, wallet.address);

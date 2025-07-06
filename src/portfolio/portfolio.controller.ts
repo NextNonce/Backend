@@ -16,7 +16,7 @@ import { PortfolioDto } from '@/portfolio/dto/portfolio.dto';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { PortfolioBalancesDto } from '@/balance/dto/portfolio-balances.dto';
 
-@ApiTags('portfolios')
+@ApiTags('Portfolios')
 @Auth()
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 @Controller('portfolios')
@@ -36,7 +36,8 @@ export class PortfolioController {
         type: PortfolioDto,
         isArray: true,
     })
-    async findAll(@CurrentUser() user: User): Promise<PortfolioDto[]> { // need
+    async findAll(@CurrentUser() user: User): Promise<PortfolioDto[]> {
+        // need
         const portfolios: Portfolio[] = await this.portfolioService.findAll(
             user.id,
         );
@@ -65,11 +66,14 @@ export class PortfolioController {
     }
 
     @Get(':id/balances/cached')
+    @ApiOkResponse({
+        description: 'Cached portfolio balances',
+        type: PortfolioBalancesDto,
+    })
     getCachedBalances(
         @CurrentUser() user: User,
         @Param() portfolioIdentifierDto: PortfolioIdentifierDto,
     ): Promise<PortfolioBalancesDto> {
-
         return this.portfolioService.getCachedBalances(
             portfolioIdentifierDto.id,
             user.id,

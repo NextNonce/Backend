@@ -31,7 +31,9 @@ export class RedisCacheProvider implements CacheProvider {
         try {
             const serializedData = await this.redisClient.get(key);
             if (serializedData === null) {
-                this.logger.debug(`GET: Cache MISS for key: ${formatMessage(key)}`);
+                this.logger.debug(
+                    `GET: Cache MISS for key: ${formatMessage(key)}`,
+                );
                 return undefined;
             }
             this.logger.debug(`GET: Cache HIT for key: ${formatMessage(key)}`);
@@ -62,7 +64,9 @@ export class RedisCacheProvider implements CacheProvider {
             };
             const stringValue = JSON.stringify(wrapper);
 
-            this.logger.debug(`SET: setting cache for key: ${formatMessage(key)}`);
+            this.logger.debug(
+                `SET: setting cache for key: ${formatMessage(key)}`,
+            );
 
             if (ttlInSeconds && ttlInSeconds > 0) {
                 // Use SET with EX option. This is 1 atomic command for set + TTL.
@@ -85,7 +89,9 @@ export class RedisCacheProvider implements CacheProvider {
 
     async del(key: string): Promise<void> {
         try {
-            this.logger.debug(`DEL: Deleting cache for key: ${formatMessage(key)}`);
+            this.logger.debug(
+                `DEL: Deleting cache for key: ${formatMessage(key)}`,
+            );
             // .del returns the number of keys deleted, await it to ensure completion
             const keysDeleted = await this.redisClient.del(key);
             this.logger.debug(

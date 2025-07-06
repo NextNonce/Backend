@@ -7,7 +7,10 @@ import { PortfolioWallet, Wallet } from '@prisma/client';
 import { PortfolioService } from '@/portfolio/portfolio.service';
 import { CreatePortfolioWalletDto } from '@/portfolio-wallet/dto/create-portfolio-wallet.dto';
 import { ConfigService } from '@nestjs/config';
-import { CACHE_TTL_FOUR_WEEKS, CACHE_TTL_ONE_WEEK } from '@/cache/constants/cache.constants';
+import {
+    CACHE_TTL_FOUR_WEEKS,
+    CACHE_TTL_ONE_WEEK,
+} from '@/cache/constants/cache.constants';
 
 @Injectable()
 export class PortfolioWalletService {
@@ -95,7 +98,10 @@ export class PortfolioWalletService {
             `Adding wallet with address ${createPortfolioWalletDto.address} to portfolio ${portfolioId} of user ${userId}`,
         );
 
-        const { existingWallet, creationData } = await this.walletService.resolveWalletData(createPortfolioWalletDto.address);
+        const { existingWallet, creationData } =
+            await this.walletService.resolveWalletData(
+                createPortfolioWalletDto.address,
+            );
 
         const portfolioWalletRecord = await this.databaseService.$transaction(
             async (db) => {
@@ -131,7 +137,7 @@ export class PortfolioWalletService {
                 portfolioWalletRecord,
             )}`,
         );
-        await this.walletService.afterUpsert(portfolioWalletRecord.wallet)
+        await this.walletService.afterUpsert(portfolioWalletRecord.wallet);
         await this.cachePortfolioWalletRecord(portfolioWalletRecord);
         await this.patchCachedAll(portfolioId, portfolioWalletRecord);
         return portfolioWalletRecord;
@@ -163,7 +169,9 @@ export class PortfolioWalletService {
                 a.portfolioWallet.createdAt.getTime() -
                 b.portfolioWallet.createdAt.getTime(),
         );
-        this.logger.debug(`Found portfolio wallets ${JSON.stringify(sortedResult)}`);
+        this.logger.debug(
+            `Found portfolio wallets ${JSON.stringify(sortedResult)}`,
+        );
         await this.cacheAll(portfolioId, sortedResult);
         return sortedResult;
     }

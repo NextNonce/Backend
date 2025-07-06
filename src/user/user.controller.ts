@@ -19,7 +19,7 @@ import { SkipUserLookup } from '@/user/decorators/skip-user-lookup.decorator';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { UserDto } from '@/user/dto/user.dto';
 
-@ApiTags('users')
+@ApiTags('Users')
 @Auth()
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 @Controller('users')

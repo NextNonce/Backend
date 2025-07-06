@@ -8,7 +8,13 @@ import {
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { DatabaseService } from '@/database/database.service';
 import { CacheService } from '@/cache/cache.service';
-import { Portfolio, PortfolioAccess, PortfolioWallet, Prisma, Wallet } from '@prisma/client';
+import {
+    Portfolio,
+    PortfolioAccess,
+    PortfolioWallet,
+    Prisma,
+    Wallet,
+} from '@prisma/client';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { PortfolioWalletService } from '@/portfolio-wallet/portfolio-wallet.service';
@@ -68,8 +74,9 @@ export class PortfolioService {
             await this.databaseService.portfolio.findMany({
                 where: { ownerId: userId },
             });
-        const sortedPortfolios =
-            portfolios.sort((a: Portfolio, b: Portfolio) => a.createdAt.getTime() - b.createdAt.getTime()
+        const sortedPortfolios = portfolios.sort(
+            (a: Portfolio, b: Portfolio) =>
+                a.createdAt.getTime() - b.createdAt.getTime(),
         );
         await this.cacheService.set(
             cacheKeyAll,
@@ -137,10 +144,8 @@ export class PortfolioService {
         portfolioId: string,
         userId: string,
     ): Promise<PortfolioBalancesDto> {
-        const wallets: { portfolioWallet: PortfolioWallet; wallet: Wallet }[] = await this.portfolioWalletService.findAll(
-            portfolioId,
-            userId,
-        );
+        const wallets: { portfolioWallet: PortfolioWallet; wallet: Wallet }[] =
+            await this.portfolioWalletService.findAll(portfolioId, userId);
 
         return await this.balanceService.getPortfolioBalancesFromCache(
             wallets.map((wallet) => wallet.wallet.address),
