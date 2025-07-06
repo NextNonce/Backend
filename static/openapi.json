@@ -1,0 +1,890 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/v1": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/users": {
+      "post": {
+        "operationId": "UserController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/v1/users/me": {
+      "get": {
+        "operationId": "UserController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User found successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "patch": {
+        "operationId": "UserController_updateMe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "delete": {
+        "operationId": "UserController_removeMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User deleted successfully"
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/v1/portfolios": {
+      "get": {
+        "operationId": "PortfolioController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of user portfolios",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortfolioDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Portfolios"
+        ]
+      }
+    },
+    "/v1/portfolios/{id}": {
+      "get": {
+        "operationId": "PortfolioController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portfolio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Portfolios"
+        ]
+      }
+    },
+    "/v1/portfolios/{id}/balances/cached": {
+      "get": {
+        "operationId": "PortfolioController_getCachedBalances",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cached portfolio balances",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioBalancesDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Portfolios"
+        ]
+      }
+    },
+    "/v1/portfolios/{id}/wallets": {
+      "get": {
+        "operationId": "PortfolioWalletController_findAll",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of wallets in the portfolio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortfolioWalletDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Portfolios"
+        ]
+      },
+      "post": {
+        "operationId": "PortfolioWalletController_createWallet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePortfolioWalletDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Wallet created in the portfolio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioWalletDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Portfolios"
+        ]
+      }
+    },
+    "/v1/wallets/{address}": {
+      "get": {
+        "operationId": "WalletController_findOne",
+        "parameters": [
+          {
+            "name": "address",
+            "required": true,
+            "in": "path",
+            "description": "The unique address of the wallet",
+            "schema": {
+              "minLength": 42,
+              "maxLength": 66,
+              "example": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns wallet details for the specified wallet address; creates the wallet if it does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Wallets"
+        ]
+      }
+    },
+    "/v1/wallets/{address}/balances": {
+      "get": {
+        "operationId": "WalletController_getBalances",
+        "parameters": [
+          {
+            "name": "address",
+            "required": true,
+            "in": "path",
+            "description": "The unique address of the wallet",
+            "schema": {
+              "minLength": 42,
+              "maxLength": 66,
+              "example": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns actual wallet balances for the specified wallet address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletBalancesDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Wallets"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "NextNonce API",
+    "description": "The NextNonce REST API",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "email",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "PortfolioAccess": {
+        "type": "string",
+        "enum": [
+          "PRIVATE",
+          "PUBLIC",
+          "UNLISTED"
+        ]
+      },
+      "PortfolioDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          },
+          "portfolioAccess": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioAccess"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "portfolioAccess",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "TotalBalanceDto": {
+        "type": "object",
+        "properties": {
+          "balanceQuote": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The total balance in quote currency (e.g., USD)",
+            "example": "1234.56"
+          },
+          "balanceQuoteChange": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The change in balance in quote currency (e.g., USD)",
+            "example": "12.34",
+            "nullable": true
+          },
+          "balanceQuoteChangePercent": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The percentage change in balance in quote currency (e.g., USD)",
+            "example": "1.23",
+            "nullable": true
+          }
+        },
+        "required": [
+          "balanceQuote"
+        ]
+      },
+      "BalanceDto": {
+        "type": "object",
+        "properties": {
+          "balanceQuote": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The total balance in quote currency (e.g., USD)",
+            "example": "1234.56"
+          },
+          "balanceQuoteChange": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The change in balance in quote currency (e.g., USD)",
+            "example": "12.34",
+            "nullable": true
+          },
+          "balanceQuoteChangePercent": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The percentage change in balance in quote currency (e.g., USD)",
+            "example": "1.23",
+            "nullable": true
+          },
+          "balanceNative": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The total balance of token (e.g., ETH, USDC, LINK, etc.) in native units",
+            "example": "1.2345"
+          }
+        },
+        "required": [
+          "balanceQuote",
+          "balanceNative"
+        ]
+      },
+      "AssetBalanceDto": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "description": "The specific asset (token or unified token) this balance refers to.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TokenDto"
+              },
+              {
+                "$ref": "#/components/schemas/UnifiedTokenDto"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "single": "#/components/schemas/TokenDto",
+                "unified": "#/components/schemas/UnifiedTokenDto"
+              }
+            }
+          },
+          "balance": {
+            "description": "The balance of the asset.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BalanceDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "asset",
+          "balance"
+        ]
+      },
+      "PortfolioBalancesDto": {
+        "type": "object",
+        "properties": {
+          "actual": {
+            "type": "boolean",
+            "description": "Is true when balances data of all wallets in the portfolio are fresh.",
+            "example": true
+          },
+          "totalBalance": {
+            "description": "Total balance of the portfolio.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TotalBalanceDto"
+              }
+            ]
+          },
+          "assetBalances": {
+            "description": "List of asset balances in the portfolio.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetBalanceDto"
+            }
+          }
+        },
+        "required": [
+          "actual",
+          "totalBalance",
+          "assetBalances"
+        ]
+      },
+      "WalletType": {
+        "type": "string",
+        "enum": [
+          "SIMPLE",
+          "SMART"
+        ]
+      },
+      "ChainType": {
+        "type": "string",
+        "enum": [
+          "EVM",
+          "CAIROVM"
+        ]
+      },
+      "PortfolioWalletDto": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 42,
+            "maxLength": 66,
+            "example": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "walletType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WalletType"
+              }
+            ]
+          },
+          "chainType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChainType"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "address",
+          "name",
+          "walletType",
+          "chainType",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreatePortfolioWalletDto": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The unique address of the wallet",
+            "example": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+            "minLength": 42,
+            "maxLength": 66
+          },
+          "name": {
+            "type": "string",
+            "description": "Custom name for the wallet within the portfolio",
+            "example": "My Savings Wallet",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        },
+        "required": [
+          "address"
+        ]
+      },
+      "WalletDto": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 42,
+            "maxLength": 66,
+            "example": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+          },
+          "walletType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WalletType"
+              }
+            ]
+          },
+          "chainType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChainType"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "address",
+          "walletType",
+          "chainType",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "WalletBalancesDto": {
+        "type": "object",
+        "properties": {
+          "totalBalance": {
+            "description": "Total balance of the wallet across different chains.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TotalBalanceDto"
+            }
+          },
+          "assetBalances": {
+            "description": "List of wallet's asset balances.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetBalanceDto"
+            }
+          }
+        },
+        "required": [
+          "totalBalance",
+          "assetBalances"
+        ]
+      },
+      "TokenMetadataDto": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Symbol of the token, e.g., ETH, USDT",
+            "example": "ETH"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the token, e.g., Ethereum",
+            "example": "Ethereum"
+          },
+          "decimals": {
+            "type": "integer",
+            "description": "Number of decimal places the token can be divided into",
+            "example": 18,
+            "minimum": 0,
+            "maximum": 255
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "URL of the token logo",
+            "example": "https://example.com/logo.png"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the token",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the token metadata was created",
+            "example": "2024-12-01T12:00:00Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the token metadata was last updated",
+            "example": "2024-12-01T12:00:00Z"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "decimals",
+          "logoUrl",
+          "description",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "TokenPriceDto": {
+        "type": "object",
+        "properties": {
+          "priceQuote": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The price of the token in quotes (e.g., USD)",
+            "example": "123.456"
+          },
+          "change": {
+            "type": "string",
+            "format": "decimal",
+            "description": "The change in price, if available, in quotes (e.g., USD)",
+            "example": "1.23",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the price was last updated",
+            "example": "2024-12-01T12:00:00Z"
+          }
+        },
+        "required": [
+          "priceQuote",
+          "timestamp"
+        ]
+      },
+      "TokenDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Discriminator for the single token type.",
+            "enum": [
+              "single"
+            ],
+            "example": "single"
+          },
+          "chainName": {
+            "type": "string",
+            "description": "The name of the blockchain network this token belongs to."
+          },
+          "address": {
+            "type": "string",
+            "description": "Unique identifier for the token on the chain"
+          },
+          "tokenMetadata": {
+            "description": "Metadata of the token, including symbol, name, decimals, etc.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TokenMetadataDto"
+              }
+            ]
+          },
+          "tokenPrice": {
+            "description": "Current price of the token in USD.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TokenPriceDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "chainName",
+          "address",
+          "tokenMetadata",
+          "tokenPrice"
+        ]
+      },
+      "UnifiedTokenDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Discriminator for the unified token type.",
+            "enum": [
+              "unified"
+            ],
+            "example": "unified"
+          },
+          "tokens": {
+            "description": "List of tokens that are unified.",
+            "items": {
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "balances": {
+            "description": "Balances of individual tokens across different chains.",
+            "items": {
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "tokenMetadata": {
+            "description": "Metadata of the unified token.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TokenMetadataDto"
+              }
+            ]
+          },
+          "tokenPrice": {
+            "description": "Price information for the unified token.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TokenPriceDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "tokens",
+          "balances",
+          "tokenMetadata",
+          "tokenPrice"
+        ]
+      }
+    }
+  }
+}
