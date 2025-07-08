@@ -44,7 +44,7 @@ The backend is designed as a modular, service-oriented application following the
 * **Modularity**: The application is divided into feature-specific modules (e.g., `User`, `Portfolio`, `Wallet`, `Balance`, `Token`). Each module encapsulates its own logic, controllers, services, and DTOs. This separation of concerns makes the codebase easier to maintain, test, and scale.
 * **Provider Abstraction**: A core architectural pattern is the use of provider interfaces. For instance:
     * `AuthProvider` (`/src/auth/interfaces/auth-provider.interface.ts`) abstracts the authentication logic, with `SupabaseAuthProvider` being the concrete implementation.
-    * `BalanceProvider` (`/src/balance/interfaces/balance-provider.interface.ts`) defines the contract for fetching wallet balances, currently implemented by `OkxDexBalanceProvider`.
+    * `MetadataProvider` (`/src/metadata/interfaces/token-metadata-provider.interface.ts`) defines the contract for fetching token's metadata, currently implemented by `DuneTokenMetadataProvider`.
     * `CacheProvider` (`/src/cache/interfaces/cache-provider.interface.ts`) abstracts caching operations, with `RedisCacheProvider` providing the implementation.
       This design allows for swapping out providers (e.g., moving from Supabase to another auth service, or adding a new balance data source) with minimal changes to the core application logic.
 * **Database & ORM**: Prisma serves as the interface to the PostgreSQL database. The schema is defined in `prisma/schema.prisma`, and migrations are managed by the Prisma CLI.
