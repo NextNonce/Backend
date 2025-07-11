@@ -7,6 +7,11 @@ import { CacheService } from '@/cache/cache.service';
 import { mockCacheService } from '../../test/helpers/cache.mock';
 import { mockConfigService } from '../../test/helpers/config.mock';
 import { ConfigService } from '@nestjs/config';
+import { BalanceService } from '@/balance/balance.service';
+import { mockBalanceService } from '../../test/helpers/balance.mock';
+import { WalletTypeUtils } from '@/wallet/utils/wallet-type.utils';
+import { mockAddressUtils, mockWalletTypeUtils } from '../../test/helpers/wallet.mock';
+import { AddressUtils } from '@/wallet/utils/address.utils';
 
 describe('WalletController', () => {
     let controller: WalletController;
@@ -22,6 +27,9 @@ describe('WalletController', () => {
                 { provide: DatabaseService, useValue: mockDatabaseService },
                 { provide: CacheService, useValue: mockCacheService },
                 { provide: ConfigService, useValue: mockConfigService },
+                { provide: BalanceService, useValue: mockBalanceService },
+                { provide: WalletTypeUtils, useValue:  mockWalletTypeUtils },
+                { provide: AddressUtils, useValue:  mockAddressUtils }
             ],
         }).compile();
 

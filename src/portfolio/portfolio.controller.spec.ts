@@ -7,6 +7,8 @@ import { CacheService } from '@/cache/cache.service';
 import { mockCacheService } from '../../test/helpers/cache.mock';
 import { PortfolioWalletService } from '@/portfolio-wallet/portfolio-wallet.service';
 import { mockPortfolioWalletService } from '../../test/helpers/portfolio-wallet.mock';
+import { BalanceService } from '@/balance/balance.service';
+import { mockBalanceService } from '../../test/helpers/balance.mock';
 
 describe('PortfolioController', () => {
     let controller: PortfolioController;
@@ -25,6 +27,7 @@ describe('PortfolioController', () => {
                     provide: PortfolioWalletService,
                     useValue: mockPortfolioWalletService,
                 },
+                { provide: BalanceService, useValue: mockBalanceService },
             ],
         }).compile();
 
