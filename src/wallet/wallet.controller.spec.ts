@@ -10,7 +10,10 @@ import { ConfigService } from '@nestjs/config';
 import { BalanceService } from '@/balance/balance.service';
 import { mockBalanceService } from '../../test/helpers/balance.mock';
 import { WalletTypeUtils } from '@/wallet/utils/wallet-type.utils';
-import { mockAddressUtils, mockWalletTypeUtils } from '../../test/helpers/wallet.mock';
+import {
+    mockAddressUtils,
+    mockWalletTypeUtils,
+} from '../../test/helpers/wallet.mock';
 import { AddressUtils } from '@/wallet/utils/address.utils';
 
 describe('WalletController', () => {
@@ -28,8 +31,8 @@ describe('WalletController', () => {
                 { provide: CacheService, useValue: mockCacheService },
                 { provide: ConfigService, useValue: mockConfigService },
                 { provide: BalanceService, useValue: mockBalanceService },
-                { provide: WalletTypeUtils, useValue:  mockWalletTypeUtils },
-                { provide: AddressUtils, useValue:  mockAddressUtils }
+                { provide: WalletTypeUtils, useValue: mockWalletTypeUtils },
+                { provide: AddressUtils, useValue: mockAddressUtils },
             ],
         }).compile();
 

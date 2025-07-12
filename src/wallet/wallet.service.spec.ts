@@ -6,9 +6,10 @@ import { createMockDatabaseService } from '../../test/helpers/database.mock';
 import { DatabaseService } from '@/database/database.service';
 import { mockConfigService } from '../../test/helpers/config.mock';
 import { ConfigService } from '@nestjs/config';
-import { BalanceService } from '@/balance/balance.service';
-import { mockBalanceService } from '../../test/helpers/balance.mock';
-import { mockAddressUtils, mockWalletTypeUtils } from '../../test/helpers/wallet.mock';
+import {
+    mockAddressUtils,
+    mockWalletTypeUtils,
+} from '../../test/helpers/wallet.mock';
 import { WalletTypeUtils } from '@/wallet/utils/wallet-type.utils';
 import { AddressUtils } from '@/wallet/utils/address.utils';
 
@@ -25,8 +26,8 @@ describe('WalletService', () => {
                 { provide: DatabaseService, useValue: mockDatabaseService },
                 { provide: CacheService, useValue: mockCacheService },
                 { provide: ConfigService, useValue: mockConfigService },
-                { provide: WalletTypeUtils, useValue:  mockWalletTypeUtils },
-                { provide: AddressUtils, useValue:  mockAddressUtils }
+                { provide: WalletTypeUtils, useValue: mockWalletTypeUtils },
+                { provide: AddressUtils, useValue: mockAddressUtils },
             ],
         }).compile();
 

@@ -17,6 +17,7 @@ import { ChainModule } from './chain/chain.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { RedisModule } from './common/redis/redis.module';
 import { PriceModule } from './price/price.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
     imports: [
@@ -40,7 +41,7 @@ import { PriceModule } from './price/price.module';
         RateLimitModule,
         PriceModule,
     ],
-    controllers: [AppController],
+    controllers: [AppController, HealthController],
     providers: [AppService],
 })
 export class AppModule {}

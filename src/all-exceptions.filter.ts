@@ -66,6 +66,15 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
             }
         }
 
+        // Not logging 404 for service-worker.js
+        if (
+            statusCode === HttpStatus.NOT_FOUND &&
+            request.url === '/service-worker.js'
+        ) {
+            const res = ctx.getResponse<any>();
+            return res.status(HttpStatus.NOT_FOUND).end();
+        }
+
         const myResponse: MyResponseObj = {
             statusCode: statusCode,
             timestamp: new Date().toISOString(),
