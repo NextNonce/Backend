@@ -14,7 +14,6 @@ import { OKX_DEX_CHAIN_MAPPER } from '@/chain/mappers/okx-dex-chain.mapper';
 import { ChainMapper } from '@/chain/interfaces/chain-mapper.interface';
 import { Decimal } from '@prisma/client/runtime/library';
 import { RateLimiterService } from '@/rate-limit/rate-limiter.service';
-import { RateLimiterStoreAbstract } from 'rate-limiter-flexible';
 
 /**
  * Represents the credentials required for API authentication.
@@ -59,7 +58,7 @@ export class OkxDexBalanceProvider implements BalanceProvider, OnModuleInit {
     private readonly logger: AppLoggerService;
     private readonly baseUrl = 'https://web3.okx.com';
     private apiCredentials: OkxApiCredentials;
-    private limiter: RateLimiterStoreAbstract;
+    private readonly queueName = OkxDexBalanceProvider.name;
 
     constructor(
         private readonly rateLimiterService: RateLimiterService,
@@ -87,10 +86,10 @@ export class OkxDexBalanceProvider implements BalanceProvider, OnModuleInit {
     }
 
     async onModuleInit() {
-        this.limiter = await this.rateLimiterService.createLimiter({
-            keyPrefix: OkxDexBalanceProvider.name, // A unique prefix for this limiter
-            points: 1, // e.g., 5 requests
-            duration: 2, // per 1 second
+        await this.rateLimiterService.registerRateLimitQueue({
+            queueName: this.queueName,
+            points: 1,
+            duration: 1,
         });
     }
 
@@ -161,31 +160,55 @@ export class OkxDexBalanceProvider implements BalanceProvider, OnModuleInit {
             chains: chainIndexes.join(','),
             excludeRiskToken: '0', // '0' means exclude risk tokens, '1' means include them
         };
-        try {
-            const response = await this.request<OkxTotalTokenBalancesResponse>(
-                'GET',
-                requestPath,
-                queryParams,
-            );
-            if (response && response.code === '0') {
-                if (response.data && response.data.length > 0)
-                    return response.data;
+
+        const maxRetries = 3;
+        const retryDelayMs = 1000;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response =
+                    await this.request<OkxTotalTokenBalancesResponse>(
+                        'GET',
+                        requestPath,
+                        queryParams,
+                    );
+                if (response && response.code === '0') {
+                    if (response.data && response.data.length > 0)
+                        return response.data;
+                    this.logger.warn(
+                        `No token assets found for address ${address}}`,
+                    );
+                }
+                // else {
+                //     this.logger.error(
+                //         `No data returned for address ${address}, with response code: ${response.code} and message: ${response.msg}`,
+                //     );
+                // }
                 this.logger.warn(
-                    `No token assets found for address ${address}}`,
+                    `[Attempt ${attempt}/${maxRetries}] API returned non-zero code or was malformed. ` +
+                        `Code: ${response?.code ?? 'undefined'}, ` + // Use optional chaining
+                        `Msg: ${response?.msg ?? 'undefined'}. Retrying...`,
                 );
-            } else {
-                this.logger.error(
-                    `No data returned for address ${address}, with response code: ${response.code} and message: ${response.msg}`,
+                //return undefined;
+            } catch (error) {
+                const requestError = error as Error;
+                // this.logger.error(
+                //     `Failed to fetch token balances for address ${address} on chains: ${requestError.message}`,
+                // );
+                this.logger.warn(
+                    `[Attempt ${attempt}/${maxRetries}] Request failed for address ${address}: ${requestError.message}. Retrying...`,
+                );
+                //return undefined;
+            }
+            if (attempt < maxRetries) {
+                await new Promise((resolve) =>
+                    setTimeout(resolve, retryDelayMs),
                 );
             }
-            return undefined;
-        } catch (error) {
-            const requestError = error as Error;
-            this.logger.error(
-                `Failed to fetch token balances for address ${address} on chains: ${requestError.message}`,
-            );
-            return undefined;
         }
+        this.logger.error(
+            `Failed to fetch token balances for address ${address} after ${maxRetries} attempts.`,
+        );
+        return undefined;
     }
 
     /**
@@ -232,60 +255,65 @@ export class OkxDexBalanceProvider implements BalanceProvider, OnModuleInit {
         requestPath: string,
         params: Record<string, any> = {},
     ): Promise<T> {
-        await this.rateLimiterService.waitForGoAhead(
-            this.limiter,
-            `${OkxDexBalanceProvider.name}:request`,
-        );
+        // await this.rateLimiterService.waitForGoAhead(
+        //     this.limiter,
+        //     `${OkxDexBalanceProvider.name}:request`,
+        // );
 
-        let fullPath = requestPath;
-        let bodyForSignature = '';
-        const config: AxiosRequestConfig = {
-            method,
-            baseURL: this.baseUrl,
-            url: fullPath,
-        };
+        return this.rateLimiterService.execute(this.queueName, async () => {
+            let fullPath = requestPath;
+            let bodyForSignature = '';
+            const config: AxiosRequestConfig = {
+                method,
+                baseURL: this.baseUrl,
+                url: fullPath,
+            };
 
-        if (method.toUpperCase() === 'GET') {
-            // For GET requests, parameters are added to the query string.
-            const queryString = new URLSearchParams(params).toString();
-            if (queryString) {
-                fullPath += `?${queryString}`;
-                config.url = fullPath;
+            if (method.toUpperCase() === 'GET') {
+                // For GET requests, parameters are added to the query string.
+                const queryString = new URLSearchParams(params).toString();
+                if (queryString) {
+                    fullPath += `?${queryString}`;
+                    config.url = fullPath;
+                }
+                // The body part of the signature string is the full query string, including the '?'.
+                // If there are no params, it's an empty string.
+                bodyForSignature = queryString ? `?${queryString}` : '';
+            } else if (method.toUpperCase() === 'POST') {
+                // For POST requests, the body is a JSON string.
+                if (Object.keys(params).length > 0) {
+                    const jsonBody = JSON.stringify(params);
+                    config.data = jsonBody;
+                    bodyForSignature = jsonBody;
+                }
             }
-            // The body part of the signature string is the full query string, including the '?'.
-            // If there are no params, it's an empty string.
-            bodyForSignature = queryString ? `?${queryString}` : '';
-        } else if (method.toUpperCase() === 'POST') {
-            // For POST requests, the body is a JSON string.
-            if (Object.keys(params).length > 0) {
-                const jsonBody = JSON.stringify(params);
-                config.data = jsonBody;
-                bodyForSignature = jsonBody;
-            }
-        }
 
-        // Generate authentication headers
-        config.headers = this.createAuthHeaders(
-            method,
-            requestPath,
-            bodyForSignature,
-        );
+            // Generate authentication headers
+            config.headers = this.createAuthHeaders(
+                method,
+                requestPath,
+                bodyForSignature,
+            );
 
-        try {
-            const response = await axios(config);
-            return response.data as T;
-        } catch (error) {
-            const responseError = error as Error;
-            if (axios.isAxiosError(responseError) && responseError.response) {
-                this.logger.error(
-                    `API request failed with status ${responseError.response.status}: ${JSON.stringify(responseError.response.data)}`,
-                );
-            } else {
-                this.logger.error(
-                    `An unexpected error occurred during the API request: ${responseError}`,
-                );
+            try {
+                const response = await axios(config);
+                return response.data as T;
+            } catch (error) {
+                const responseError = error as Error;
+                if (
+                    axios.isAxiosError(responseError) &&
+                    responseError.response
+                ) {
+                    this.logger.error(
+                        `API request failed with status ${responseError.response.status}: ${JSON.stringify(responseError.response.data)}`,
+                    );
+                } else {
+                    this.logger.error(
+                        `An unexpected error occurred during the API request: ${responseError}`,
+                    );
+                }
+                throwLogged(new InternalServerErrorException(responseError));
             }
-            throwLogged(new InternalServerErrorException(responseError));
-        }
+        });
     }
 }
