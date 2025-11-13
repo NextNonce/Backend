@@ -90,7 +90,7 @@ export class OkxDexBalanceProvider implements BalanceProvider, OnModuleInit {
         this.limiter = await this.rateLimiterService.createLimiter({
             keyPrefix: OkxDexBalanceProvider.name, // A unique prefix for this limiter
             points: 1, // e.g., 5 requests
-            duration: 2, // per 1 second
+            duration: 1.5, // per 1 second
         });
     }
 
@@ -161,31 +161,45 @@ export class OkxDexBalanceProvider implements BalanceProvider, OnModuleInit {
             chains: chainIndexes.join(','),
             excludeRiskToken: '0', // '0' means exclude risk tokens, '1' means include them
         };
-        try {
-            const response = await this.request<OkxTotalTokenBalancesResponse>(
-                'GET',
-                requestPath,
-                queryParams,
-            );
-            if (response && response.code === '0') {
-                if (response.data && response.data.length > 0)
-                    return response.data;
+
+        const maxRetries = 3;
+        const retryDelayMs = 1000;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response =
+                    await this.request<OkxTotalTokenBalancesResponse>(
+                        'GET',
+                        requestPath,
+                        queryParams,
+                    );
+                if (response && response.code === '0') {
+                    if (response.data && response.data.length > 0)
+                        return response.data;
+                    this.logger.warn(
+                        `No token assets found for address ${address}}`,
+                    );
+                }
                 this.logger.warn(
-                    `No token assets found for address ${address}}`,
+                    `[Attempt ${attempt}/${maxRetries}] API returned non-zero code or was malformed. ` +
+                    `Code: ${response?.code ?? 'undefined'}, ` + // Use optional chaining
+                    `Msg: ${response?.msg ?? 'undefined'}. Retrying...`,
                 );
-            } else {
-                this.logger.error(
-                    `No data returned for address ${address}, with response code: ${response.code} and message: ${response.msg}`,
+            } catch (error) {
+                const requestError = error as Error;
+                this.logger.warn(
+                    `[Attempt ${attempt}/${maxRetries}] Request failed for address ${address}: ${requestError.message}. Retrying...`,
                 );
             }
-            return undefined;
-        } catch (error) {
-            const requestError = error as Error;
-            this.logger.error(
-                `Failed to fetch token balances for address ${address} on chains: ${requestError.message}`,
-            );
-            return undefined;
+            if (attempt < maxRetries) {
+                await new Promise((resolve) =>
+                    setTimeout(resolve, retryDelayMs),
+                );
+            }
         }
+        this.logger.error(
+            `Failed to fetch token balances for address ${address} after ${maxRetries} attempts.`,
+        );
+        return undefined;
     }
 
     /**
