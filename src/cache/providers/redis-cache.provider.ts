@@ -174,53 +174,63 @@ export class RedisCacheProvider implements CacheProvider {
         if (items.length === 0) {
             return;
         }
+        const CHUNK_SIZE = 5_000;
         try {
-            // IMPORTANT TRADE-OFF: Native MSET does NOT support per-item TTLs.
-            // To be command-effective, we sacrifice per-item TTL in this specific function.
-            // If TTL is needed, we must use a MULTI pipeline, which increases command count.
-            const now = Date.now();
-            const keyValuePairs: Record<string, string> = {};
-            let usePipeline = false;
-            for (const item of items) {
-                if (item.ttlInSeconds && item.ttlInSeconds > 0) {
-                    usePipeline = true;
-                    break; // If any item has a TTL, we must use the pipeline approach
-                }
-                const wrapper: CacheWrapper<T> = {
-                    value: item.value,
-                    timestamp: now,
-                };
-                keyValuePairs[item.key] = JSON.stringify(wrapper);
-            }
-
-            if (usePipeline) {
-                const multi = this.redisClient.multi();
-                items.forEach((item) => {
+            const processChunk = async (chunk: CacheMSetItem<T>[]) => {
+                // IMPORTANT TRADE-OFF: Native MSET does NOT support per-item TTLs.
+                // To be command-effective, we sacrifice per-item TTL in this specific function.
+                // If TTL is needed, we must use a MULTI pipeline, which increases command count.
+                const now = Date.now();
+                const keyValuePairs: Record<string, string> = {};
+                let usePipeline = false;
+                for (const item of chunk) {
+                    if (item.ttlInSeconds && item.ttlInSeconds > 0) {
+                        usePipeline = true;
+                        break; // If any item has a TTL, we must use the pipeline approach
+                    }
                     const wrapper: CacheWrapper<T> = {
                         value: item.value,
                         timestamp: now,
                     };
-                    if (item.ttlInSeconds) {
-                        multi.set(
-                            item.key,
-                            JSON.stringify(wrapper),
-                            'EX',
-                            item.ttlInSeconds,
-                        );
-                    } else {
-                        multi.set(item.key, JSON.stringify(wrapper));
-                    }
-                });
-                await multi.exec();
-                this.logger.debug(
-                    `MSET: TTL detected. Using MULTI pipeline for ${items.length} items.`,
-                );
-            } else {
-                await this.redisClient.mset(keyValuePairs);
-                this.logger.debug(
-                    `MSET: No TTLs. Using native MSET for ${items.length} items.`,
-                );
+                    keyValuePairs[item.key] = JSON.stringify(wrapper);
+                }
+
+                if (usePipeline) {
+                    const multi = this.redisClient.multi();
+                    chunk.forEach((item) => {
+                        const wrapper: CacheWrapper<T> = {
+                            value: item.value,
+                            timestamp: now,
+                        };
+                        if (item.ttlInSeconds) {
+                            multi.set(
+                                item.key,
+                                JSON.stringify(wrapper),
+                                'EX',
+                                item.ttlInSeconds,
+                            );
+                        } else {
+                            multi.set(item.key, JSON.stringify(wrapper));
+                        }
+                    });
+                    await multi.exec();
+                    this.logger.debug(
+                        `MSET: TTL detected. Using MULTI pipeline for ${items.length} items.`,
+                    );
+                } else {
+                    await this.redisClient.mset(keyValuePairs);
+                    this.logger.debug(
+                        `MSET: No TTLs. Using native MSET for ${items.length} items.`,
+                    );
+                }
+            };
+
+            const chunks: CacheMSetItem<T>[][] = [];
+            for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+                chunks.push(items.slice(i, i + CHUNK_SIZE));
             }
+
+            await Promise.all(chunks.map(chunk => processChunk(chunk)));
         } catch (error) {
             const redisError = error as Error;
             this.logger.error(`MSET: Redis error: ${redisError.message}`);
