@@ -153,7 +153,7 @@ export class OkxDexBalanceProvider implements BalanceProvider, OnModuleInit {
         address: string,
         chainIndexes: string[],
     ): Promise<OkxChainTokenAssetsResponse[] | undefined> {
-        const requestPath = '/api/v5/dex/balance/all-token-balances-by-address';
+        const requestPath = '/api/v6/dex/balance/all-token-balances-by-address';
 
         // The API expects 'chains' as a comma-separated string in the query.
         const queryParams = {
@@ -191,7 +191,7 @@ export class OkxDexBalanceProvider implements BalanceProvider, OnModuleInit {
     /**
      * Generates the required authentication headers for an API request.
      * @param method - The HTTP method (e.g., 'GET', 'POST').
-     * @param requestPath - The API endpoint path (e.g., '/v5/wallet/asset/all-token-balances-by-address').
+     * @param requestPath - The API endpoint path (e.g., '/v6/wallet/asset/all-token-balances-by-address').
      * @param body - The request body for POST requests, or query string for GET requests.
      * @returns The headers object for the request.
      */
