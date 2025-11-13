@@ -9,7 +9,6 @@ import {
 import { throwLogged } from '@/common/helpers/error.helper';
 import { DUNE_CHAIN_MAPPER } from '@/chain/mappers/dune-chain.mapper';
 import { ChainMapper } from '@/chain/interfaces/chain-mapper.interface';
-import { RateLimiterStoreAbstract } from 'rate-limiter-flexible';
 import { RateLimiterService } from '@/rate-limit/rate-limiter.service';
 
 /**
@@ -149,7 +148,7 @@ export class DuneTokenMetadataProvider
 {
     private readonly logger: AppLoggerService;
     private readonly DUNE_API_KEY: string;
-    private limiter: RateLimiterStoreAbstract;
+    private readonly queueName = DuneTokenMetadataProvider.name;
 
     constructor(
         private readonly rateLimiterService: RateLimiterService,
@@ -167,10 +166,10 @@ export class DuneTokenMetadataProvider
     }
 
     async onModuleInit() {
-        this.limiter = await this.rateLimiterService.createLimiter({
-            keyPrefix: DuneTokenMetadataProvider.name, // A unique prefix for this limiter
-            points: 5, // e.g., 5 requests
-            duration: 2, // per 1 second
+        await this.rateLimiterService.registerRateLimitQueue({
+            queueName: this.queueName,
+            points: 5,
+            duration: 1,
         });
     }
 
@@ -178,61 +177,58 @@ export class DuneTokenMetadataProvider
         walletAddress: string,
         chainNames: string[],
     ): Promise<ExternalTokenMetadataDto[] | undefined> {
-        await this.rateLimiterService.waitForGoAhead(
-            this.limiter,
-            `${DuneTokenMetadataProvider.name}:getByWalletAddress`,
-        );
-
-        this.logger.debug(
-            `Fetching token metadata for wallet: ${walletAddress} on chains: ${chainNames.join(', ')}`,
-        );
-        const duneChainIds = chainNames.map((name) =>
-            this.duneChainMapper.toExternalChainId(name),
-        );
-        const options: DuneFetchBalanceOptions = {
-            chain_ids: duneChainIds.join(','),
-            metadata: 'logo,url',
-            limit: 10000, // Big enough to cover most wallets
-        };
-        const rawBalanceData = await fetchBalances(
-            this.DUNE_API_KEY,
-            walletAddress,
-            options,
-            this.logger,
-        );
-        if (!rawBalanceData) {
-            this.logger.error(
-                `Failed to fetch metadata of tokens for wallet ${walletAddress}`,
+        return this.rateLimiterService.execute(this.queueName, async () => {
+            this.logger.debug(
+                `Fetching token metadata for wallet: ${walletAddress} on chains: ${chainNames.join(', ')}`,
             );
-            return undefined;
-        }
-        if (rawBalanceData.errors) {
-            for (const error of rawBalanceData.errors.token_errors || []) {
-                if (error.description !== 'Failed to obtain balance')
-                    this.logger.error(
-                        `Error for token ${error.address} on chain ${error.chain_id}: ${error.description}`,
-                    );
+            const duneChainIds = chainNames.map((name) =>
+                this.duneChainMapper.toExternalChainId(name),
+            );
+            const options: DuneFetchBalanceOptions = {
+                chain_ids: duneChainIds.join(','),
+                metadata: 'logo,url',
+                limit: 10000, // Big enough to cover most wallets
+            };
+            const rawBalanceData = await fetchBalances(
+                this.DUNE_API_KEY,
+                walletAddress,
+                options,
+                this.logger,
+            );
+            if (!rawBalanceData) {
+                this.logger.error(
+                    `Failed to fetch metadata of tokens for wallet ${walletAddress}`,
+                );
+                return undefined;
             }
-        }
-        if (rawBalanceData.balances && rawBalanceData.balances.length > 0) {
-            return rawBalanceData.balances.map(
-                (response) =>
-                    new ExternalTokenMetadataDto({
-                        chainName: this.duneChainMapper.toChainName(
-                            response.chain,
-                        ),
-                        address: response.address,
-                        symbol: response.symbol || undefined,
-                        name: response.name || undefined,
-                        decimals: response.decimals || undefined,
-                        logoUrl: response.token_metadata?.logo || undefined,
-                    }),
-            );
-        } else {
-            this.logger.warn(
-                `No token balances found for wallet ${walletAddress} on chains ${chainNames.join(', ')}`,
-            );
-            return [];
-        }
+            if (rawBalanceData.errors) {
+                for (const error of rawBalanceData.errors.token_errors || []) {
+                    if (error.description !== 'Failed to obtain balance')
+                        this.logger.error(
+                            `Error for token ${error.address} on chain ${error.chain_id}: ${error.description}`,
+                        );
+                }
+            }
+            if (rawBalanceData.balances && rawBalanceData.balances.length > 0) {
+                return rawBalanceData.balances.map(
+                    (response) =>
+                        new ExternalTokenMetadataDto({
+                            chainName: this.duneChainMapper.toChainName(
+                                response.chain,
+                            ),
+                            address: response.address,
+                            symbol: response.symbol || undefined,
+                            name: response.name || undefined,
+                            decimals: response.decimals || undefined,
+                            logoUrl: response.token_metadata?.logo || undefined,
+                        }),
+                );
+            } else {
+                this.logger.warn(
+                    `No token balances found for wallet ${walletAddress} on chains ${chainNames.join(', ')}`,
+                );
+                return [];
+            }
+        });
     }
 }
