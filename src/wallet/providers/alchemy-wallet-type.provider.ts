@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { AppLoggerService } from '@/app-logger/app-logger.service';
 import { Alchemy, Network } from 'alchemy-sdk';
-import { RateLimiterStoreAbstract } from 'rate-limiter-flexible';
 import { RateLimiterService } from '@/rate-limit/rate-limiter.service';
 import { throwLogged } from '@/common/helpers/error.helper';
 import { WalletTypeProvider } from '@/wallet/interfaces/wallet-type-provider.interface';
@@ -17,7 +16,7 @@ export class AlchemyWalletTypeProvider
     private readonly logger: AppLoggerService;
     private readonly ALCHEMY_API_KEY: string;
     private readonly alchemyInstances: Record<Network, Alchemy>;
-    private limiter: RateLimiterStoreAbstract;
+    private readonly queueName = AlchemyWalletTypeProvider.name;
 
     // List of networks to check for EVM contracts
     private readonly EVMNetworksToCheck: Network[] = [
@@ -51,10 +50,10 @@ export class AlchemyWalletTypeProvider
     }
 
     async onModuleInit() {
-        this.limiter = await this.rateLimiterService.createLimiter({
-            keyPrefix: AlchemyWalletTypeProvider.name, // A unique prefix for this limiter
-            points: 25, // e.g., 5 requests
-            duration: 2, // per 1 second
+        await this.rateLimiterService.registerRateLimitQueue({
+            queueName: this.queueName,
+            points: 25,
+            duration: 1,
         });
     }
 
@@ -76,21 +75,20 @@ export class AlchemyWalletTypeProvider
     // Checks if the provided address corresponds to an EVM smart contract.
     public async isEVMSmartContract(address: string): Promise<boolean> {
         const checks = this.EVMNetworksToCheck.map(async (network) => {
-            await this.rateLimiterService.waitForGoAhead(
-                this.limiter,
-                `${AlchemyWalletTypeProvider.name}:isEVMSmartContract`,
-            );
-
-            try {
-                const code =
-                    await this.alchemyInstances[network].core.getCode(address);
-                return code !== '0x' && code.length > 2;
-            } catch (error) {
-                this.logger.warn(
-                    `Failed to get checksum EVM address ${address} on ${network}: ${error}`,
-                );
-                return false;
-            }
+            return this.rateLimiterService.execute(this.queueName, async () => {
+                try {
+                    const code =
+                        await this.alchemyInstances[network].core.getCode(
+                            address,
+                        );
+                    return code !== '0x' && code.length > 2;
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to get checksum EVM address ${address} on ${network}: ${error}`,
+                    );
+                    return false;
+                }
+            });
         });
 
         const results = await Promise.allSettled(checks);
